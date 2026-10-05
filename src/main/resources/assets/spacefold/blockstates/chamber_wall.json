@@ -1,0 +1,27 @@
+{
+	"variants": {
+		"facing=up": {
+			"model": "spacefold:block/chamber_wall",
+			"x": 270
+		},
+		"facing=down": {
+			"model": "spacefold:block/chamber_wall",
+			"x": 90
+		},
+		"facing=north": {
+			"model": "spacefold:block/chamber_wall"
+		},
+		"facing=south": {
+			"model": "spacefold:block/chamber_wall",
+			"y": 180
+		},
+		"facing=west": {
+			"model": "spacefold:block/chamber_wall",
+			"y": 270
+		},
+		"facing=east": {
+			"model": "spacefold:block/chamber_wall",
+			"y": 90
+		}
+	}
+}

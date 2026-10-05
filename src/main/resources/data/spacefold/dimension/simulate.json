@@ -1,0 +1,12 @@
+{
+	"type": "spacefold:simulate",
+	"generator": {
+		"type": "minecraft:flat",
+		"settings": {
+			"layers": [],
+			"biome": "spacefold:room",
+			"features": false,
+			"lakes": false
+		}
+	}
+}

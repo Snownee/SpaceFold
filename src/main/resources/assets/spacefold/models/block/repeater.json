@@ -1,0 +1,12 @@
+{
+	"parent": "minecraft:block/cube",
+	"textures": {
+		"particle": "minecraft:block/budding_amethyst",
+		"down": "minecraft:block/amethyst_block",
+		"up": "minecraft:block/amethyst_block",
+		"north": "minecraft:block/budding_amethyst",
+		"east": "minecraft:block/amethyst_block",
+		"south": "minecraft:block/amethyst_block",
+		"west": "minecraft:block/amethyst_block"
+	}
+}

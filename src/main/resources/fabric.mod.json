@@ -1,0 +1,46 @@
+{
+	"schemaVersion": 1,
+	"id": "spacefold",
+	"version": "${version}",
+	"name": "Space Fold",
+	"description": "Compact a full-scale production line into your personal space shard.\n\nSome textures are from malcolmriley/unused-textures (CC-BY-4.0): https://github.com/malcolmriley/unused-textures",
+	"license": "ARR",
+	"entrypoints": {
+		"main": [
+			"snownee.spacefold.util.CommonProxy"
+		],
+		"client": [
+			"snownee.spacefold.util.ClientProxy"
+		],
+		"jade": [
+			"snownee.spacefold.compat.jade.JadeCompat"
+		],
+		"fabric-datagen": [
+			"snownee.spacefold.datagen.SpaceFoldDataGen"
+		]
+	},
+	"mixins": [
+		"spacefold.mixins.json"
+	],
+	"accessWidener": "spacefold.classtweaker",
+	"depends": {
+		"kiwi": ">=26",
+		"xercapaint": "*"
+	},
+	"suggests": {
+		"jade": "*"
+	},
+	"contact": {
+		"homepage": "https://www.curseforge.com/minecraft/mc-mods/space-fold",
+		"sources": "https://github.com/Snownee/SpaceFold",
+		"issues": "https://github.com/Snownee/SpaceFold/issues"
+	},
+	"custom": {
+		"modmenu": {
+			"links": {
+				"modmenu.discord": "https://discord.gg/KzGQW7a",
+				"modmenu.donate": "https://ko-fi.com/snownee"
+			}
+		}
+	}
+}

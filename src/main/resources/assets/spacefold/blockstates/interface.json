@@ -1,0 +1,27 @@
+{
+	"variants": {
+		"facing=up": {
+			"model": "spacefold:block/interface",
+			"x": 270
+		},
+		"facing=down": {
+			"model": "spacefold:block/interface",
+			"x": 90
+		},
+		"facing=north": {
+			"model": "spacefold:block/interface"
+		},
+		"facing=south": {
+			"model": "spacefold:block/interface",
+			"y": 180
+		},
+		"facing=west": {
+			"model": "spacefold:block/interface",
+			"y": 270
+		},
+		"facing=east": {
+			"model": "spacefold:block/interface",
+			"y": 90
+		}
+	}
+}

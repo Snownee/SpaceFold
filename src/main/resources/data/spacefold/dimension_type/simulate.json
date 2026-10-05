@@ -1,0 +1,27 @@
+{
+	"has_skylight": false,
+	"has_ceiling": false,
+	"has_ender_dragon_fight": false,
+	"coordinate_scale": 1.0,
+	"min_y": 0,
+	"height": 256,
+	"logical_height": 256,
+	"infiniburn": "#minecraft:infiniburn_overworld",
+	"ambient_light": 1.0,
+	"monster_spawn_light_level": 0,
+	"monster_spawn_block_light_limit": 0,
+	"has_fixed_time": true,
+	"attributes": {
+		"minecraft:gameplay/bed_rule": {
+			"can_set_spawn": "never",
+			"can_sleep": "when_dark"
+		},
+		"minecraft:gameplay/respawn_anchor_works": false,
+		"minecraft:visual/ambient_light_color": "#ffffff",
+		"minecraft:visual/fog_color": "#0f0f16",
+		"minecraft:visual/sky_color": "#000000",
+		"minecraft:visual/sky_light_color": "#ffffff",
+		"minecraft:visual/sky_light_factor": 0.0,
+		"minecraft:visual/star_brightness": 0.75
+	}
+}

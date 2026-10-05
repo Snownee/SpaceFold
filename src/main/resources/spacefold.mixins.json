@@ -1,0 +1,25 @@
+{
+	"required": true,
+	"package": "snownee.spacefold.mixin",
+	"plugin": "snownee.spacefold.mixin.MixinPlugin",
+	"compatibilityLevel": "JAVA_25",
+	"mixins": [
+		"LevelMixin",
+		"MinecraftServerMixin",
+		"ServerPlayerGameModeMixin",
+		"ServerPlayerMixin"
+	],
+	"client": [
+		"client.ClientPacketListenerMixin",
+		"client.ItemStackMixin",
+		"client.LocalPlayerMixin",
+		"client.MultiPlayerGameModeMixin",
+		"client.SkyRendererMixin",
+		"client.TextureAtlasSpriteInvoker"
+	],
+	"injectors": {
+		"defaultRequire": 1,
+		"maxShiftBy": 2
+	},
+	"minVersion": "0.8"
+}

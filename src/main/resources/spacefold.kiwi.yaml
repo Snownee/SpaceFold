@@ -1,0 +1,11 @@
+configs:
+  - target: snownee.spacefold.SpaceFoldConfig
+modules:
+  - target: snownee.spacefold.CoreModule
+packets:
+  - target: snownee.spacefold.network.CSimulatorUsePacket
+  - target: snownee.spacefold.network.SFactoryMaterialsPacket
+  - target: snownee.spacefold.network.SHighlightBlocksPacket
+  - target: snownee.spacefold.network.SSimulationRatesPacket
+  - target: snownee.spacefold.network.SSimulationResultPacket
+useDataModule: true

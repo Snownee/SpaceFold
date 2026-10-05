@@ -1,0 +1,130 @@
+plugins {
+    id 'net.fabricmc.fabric-loom' version "${loom_version}"
+    id 'maven-publish'
+    id "me.modmuss50.mod-publish-plugin" version "2.+"
+}
+
+version = "mc${archive_minecraft_version}-Fabric-${mod_version}"
+group = project.maven_group
+var realVersion = project.mod_version + '+fabric'
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+    maven { url "https://maven.terraformersmc.com/releases/" }
+    maven { url "https://maven.terraformersmc.com/" }
+    flatDir {
+        dirs 'libs'
+    }
+}
+
+loom {
+    accessWidenerPath = file("src/main/resources/${project.mod_id}.classtweaker")
+}
+
+fabricApi {
+    configureDataGeneration() {
+        modId = project.mod_id
+        client = true
+        outputDirectory = file("src/generated/resources")
+        createSourceSet = true
+        strictValidation = false
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+    implementation "com.terraformersmc:modmenu:${project.modmenu_version}"
+
+    implementation annotationProcessor("maven.modrinth:kiwi:${project.kiwi_version}+fabric")
+
+    implementation "maven.modrinth:jade:${project.jade_version}+fabric"
+
+    implementation "maven.modrinth:cloth-config:${project.cloth_config_version}+fabric"
+
+    implementation "maven.modrinth:lychee:${project.lychee_version}+fabric"
+
+    implementation "teamreborn:energy:${project.energy_version}"
+    include "teamreborn:energy:${project.energy_version}"
+
+    implementation "maven.modrinth:joy-of-painting:26.1.2-1.0.0"
+
+    runtimeOnly "maven.modrinth:techreborn:${project.techreborn_version}"
+    runtimeOnly "maven.modrinth:orthocamera:0.1.10+26.1"
+    runtimeOnly "maven.modrinth:jei:29.43.0.107"
+    runtimeOnly "maven.modrinth:mezzconfig:H7JmEX05"
+}
+
+processResources {
+    inputs.property "version", realVersion
+
+    filesMatching("fabric.mod.json") {
+        expand "version": realVersion
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.encoding = "UTF-8"
+    it.options.release = 25
+    it.options.compilerArgs.add("-Akiwi.useDataModule")
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_25
+    targetCompatibility = JavaVersion.VERSION_25
+}
+
+jar {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude("/assets/${project.mod_id}/lang/en_us.existing.json")
+    exclude(".gitkeep")
+
+    exclude '**/*.py'
+    exclude '**/*.zip'
+}
+
+publishMods {
+    file = jar.archiveFile
+    changelog = file('CHANGELOG.md').exists() ? file('CHANGELOG.md').text : ''
+    type = ['release': STABLE, 'beta': BETA, 'alpha': ALPHA][release_type]
+    modLoaders.add("fabric")
+    displayName = "[Fabric ${supported_version}] ${mod_version}"
+    version = realVersion
+
+    curseforge {
+        projectId = "1732989"
+        client = true
+        server = true
+        accessToken = providers.environmentVariable("CURSE_TOKEN")
+        minecraftVersions.add(minecraft_version)
+        minecraftVersions.add("26.1")
+        minecraftVersions.add("26.1.1")
+        requires("fabric-api")
+        requires("kiwi-fabric")
+        requires("jade")
+        requires("joy-of-painting")
+    }
+    modrinth {
+        projectId = "22Tuwa3i"
+        accessToken = providers.environmentVariable("MODRINTH_TOKEN")
+        minecraftVersions.add(minecraft_version)
+        minecraftVersions.add("26.1")
+        minecraftVersions.add("26.1.1")
+        requires("fabric-api")
+        requires("kiwi")
+        requires("jade")
+        requires("joy-of-painting")
+    }
+}

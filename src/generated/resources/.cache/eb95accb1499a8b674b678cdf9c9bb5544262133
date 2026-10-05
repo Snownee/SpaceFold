@@ -1,0 +1,10 @@
+// 26.1.2	-999999999-01-01T00:00:00	Space Fold/Model Definitions
+6e2cfb328810fb6008c86c2f832084f7372ced65 assets/spacefold/items/chamber_wall.json
+5a8f015727c035f6830afcd2073dc1afb640d53e assets/spacefold/items/factory.json
+fd62e4e88e806292ae5e5b1491d3d780dcbf726d assets/spacefold/items/interface.json
+090a08641f3fb337c630f27579fc9b7f5711d9b2 assets/spacefold/items/opener.json
+fcbdc9ebffcbb731a669004f2c8246ec70f31b9c assets/spacefold/items/repeater.json
+dd39eb260cdc8f748a64c37a4215c337f1ea9086 assets/spacefold/items/simulator.json
+bd721385e8bb8bf981c7a5e7a4d54ecf81cbcfc4 assets/spacefold/models/item/chamber_wall.json
+98c29b15f4fd1c1537a7921bc2c2cae3598a255e assets/spacefold/models/item/interface.json
+b04375e9705379e64aaeaa272b2b1a568c40afc6 assets/spacefold/models/item/opener.json

@@ -1,0 +1,27 @@
+{
+	"variants": {
+		"facing=down": {
+			"model": "spacefold:block/repeater",
+			"x": 90
+		},
+		"facing=up": {
+			"model": "spacefold:block/repeater",
+			"x": 270
+		},
+		"facing=north": {
+			"model": "spacefold:block/repeater"
+		},
+		"facing=south": {
+			"model": "spacefold:block/repeater",
+			"y": 180
+		},
+		"facing=east": {
+			"model": "spacefold:block/repeater",
+			"y": 90
+		},
+		"facing=west": {
+			"model": "spacefold:block/repeater",
+			"y": 270
+		}
+	}
+}
