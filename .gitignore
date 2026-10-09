@@ -26,3 +26,5 @@ run/*
 /.factorypath
 /runs
 /libs/*.jar
+
+/CHANGELOG.md
