@@ -90,7 +90,7 @@ public class SimulatorBlock extends HorizontalDirectionalBlock implements Entity
 			return;
 		}
 		SimulationResult result = RoomManager.simulationResult(serverLevel, blockEntity.getRoomIndex());
-		if (result != null && !result.failed()) {
+		if (result != null && (!result.failed() || result.hasSnapshot())) {
 			stack.set(CoreModule.SIMULATION_RESULT.get(), result);
 		}
 	}

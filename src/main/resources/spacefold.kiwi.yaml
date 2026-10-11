@@ -1,11 +1,19 @@
 configs:
+  - target: snownee.spacefold.SpaceFoldClientConfig
+    data:
+      type: CLIENT
   - target: snownee.spacefold.SpaceFoldConfig
 modules:
   - target: snownee.spacefold.CoreModule
+    data:
+      modId: spacefold
 packets:
+  - target: snownee.spacefold.network.CRepeaterConfigPacket
   - target: snownee.spacefold.network.CSimulatorUsePacket
-  - target: snownee.spacefold.network.SFactoryMaterialsPacket
+  - target: snownee.spacefold.network.CSnapshotRequestPacket
   - target: snownee.spacefold.network.SHighlightBlocksPacket
   - target: snownee.spacefold.network.SSimulationRatesPacket
   - target: snownee.spacefold.network.SSimulationResultPacket
+  - target: snownee.spacefold.network.SSnapshotPacket
+  - target: snownee.spacefold.network.SViewDetailsPacket
 useDataModule: true

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "A": "minecraft:amethyst_block",
+    "D": "minecraft:diamond",
+    "S": "spacefold:simulator"
+  },
+  "pattern": [
+    "DAD",
+    "ASA",
+    "DAD"
+  ],
+  "result": {
+    "id": "spacefold:repeater"
+  }
+}

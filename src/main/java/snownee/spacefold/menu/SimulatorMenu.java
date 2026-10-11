@@ -13,13 +13,17 @@ import net.minecraft.world.item.ItemStack;
 import snownee.kiwi.network.KPacketSender;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.block.entity.SimulatorBlockEntity;
+import snownee.spacefold.dim.Plan;
 import snownee.spacefold.dim.RoomManager;
+import snownee.spacefold.dim.RoomSnapshot;
 import snownee.spacefold.dim.SimulationManager;
+import snownee.spacefold.dim.SimulationResult;
 import snownee.spacefold.network.SSimulationResultPacket;
 
 public class SimulatorMenu extends AbstractContainerMenu {
 	public static final int BUTTON_TELEPORT = 0;
-	public static final int BUTTON_SIMULATE = 1;
+	public static final int BUTTON_TELEPORT_NO_WINDOWS = 1;
+	public static final int BUTTON_SIMULATE = 2;
 
 	private final BlockPos pos;
 	private final @Nullable ServerLevel level;
@@ -42,7 +46,9 @@ public class SimulatorMenu extends AbstractContainerMenu {
 		updateStatus();
 		addDataSlots(data);
 		if (level != null && data.get(0) >= 0 && inventory.player instanceof ServerPlayer serverPlayer) {
-			KPacketSender.send(new SSimulationResultPacket(containerId, RoomManager.simulationResult(level, data.get(0))), serverPlayer);
+			int room = data.get(0);
+			SimulationResult result = RoomManager.simulationResult(level, room);
+			KPacketSender.send(new SSimulationResultPacket(containerId, result), serverPlayer);
 		}
 	}
 
@@ -72,8 +78,13 @@ public class SimulatorMenu extends AbstractContainerMenu {
 
 	@Override
 	public boolean clickMenuButton(Player player, int buttonId) {
+		boolean windows = true;
+		if (buttonId == BUTTON_TELEPORT_NO_WINDOWS) {
+			buttonId = BUTTON_TELEPORT;
+			windows = false;
+		}
 		if (buttonId == BUTTON_TELEPORT && player instanceof ServerPlayer serverPlayer) {
-			RoomManager.useSimulator(serverPlayer.level(), serverPlayer, pos);
+			RoomManager.useSimulator(serverPlayer.level(), serverPlayer, pos, windows);
 			return true;
 		}
 		if (buttonId == BUTTON_SIMULATE && player instanceof ServerPlayer serverPlayer) {

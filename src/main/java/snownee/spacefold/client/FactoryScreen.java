@@ -3,10 +3,12 @@ package snownee.spacefold.client;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.mojang.blaze3d.platform.InputConstants;
+
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
+import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
@@ -33,19 +35,18 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 	}
 
 	@Override
-	protected void init() {
-		super.init();
-		addRenderableWidget(Button.builder(
-						Component.translatable("gui.spacefold.factory_materials"),
-						button -> this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, FactoryMenu.BUTTON_MATERIALS))
-				.bounds(this.leftPos + 8, this.topPos + 58, 160, 20)
-				.build());
-	}
-
-	@Override
 	public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
 		super.extractBackground(graphics, mouseX, mouseY, partialTick);
 		graphics.blit(RenderPipelines.GUI_TEXTURED, TEXTURE, leftPos, topPos, 0.0F, 0.0F, imageWidth, imageHeight, 256, 256);
+	}
+
+	@Override
+	public boolean keyPressed(KeyEvent event) {
+		if (event.key() == InputConstants.KEY_SPACE && minecraft.player != null && minecraft.player.isCreative()) {
+			minecraft.gameMode.handleInventoryButtonClick(menu.containerId, FactoryMenu.BUTTON_CREATE);
+			return true;
+		}
+		return super.keyPressed(event);
 	}
 
 	@Override

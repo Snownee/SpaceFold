@@ -14,10 +14,11 @@ import net.minecraft.world.item.ItemStack;
 import snownee.kiwi.network.KPacketSender;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.block.entity.FactoryBlockEntity;
-import snownee.spacefold.network.SFactoryMaterialsPacket;
+import snownee.spacefold.network.SViewDetailsPacket;
 
 public class FactoryMenu extends AbstractContainerMenu {
 	public static final int BUTTON_MATERIALS = 0;
+	public static final int BUTTON_CREATE = 1;
 
 	private final Container container;
 	private final ContainerData data;
@@ -52,8 +53,11 @@ public class FactoryMenu extends AbstractContainerMenu {
 	public boolean clickMenuButton(Player player, int buttonId) {
 		if (buttonId == BUTTON_MATERIALS && player instanceof ServerPlayer serverPlayer &&
 				container instanceof FactoryBlockEntity factory) {
-			KPacketSender.send(new SFactoryMaterialsPacket(factory.materialProgresses(), true), serverPlayer);
+			KPacketSender.send(new SViewDetailsPacket(factory.materialProgresses(), true, factory.templateSnapshotId()), serverPlayer);
 			return true;
+		}
+		if (buttonId == BUTTON_CREATE && player.isCreative() && container instanceof FactoryBlockEntity factory) {
+			return factory.creativeInstantProduce();
 		}
 		return false;
 	}

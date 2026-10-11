@@ -100,8 +100,10 @@ public final class FogVolume {
 	/**
 	 * 由 {@code mixin.client.SkyRendererMixin} 在 {@code SkyRenderer.renderSunMoonAndStars} 的 TAIL 调用。
 	 * 传入的 poseStack 此时是单位矩阵，因此只需并入 model-view 的相机视角旋转即可。
+	 *
+	 * @param alpha 整体不透明度（0~1），乘进 ColorModulator 用于淡入淡出
 	 */
-	public static void render(PoseStack poseStack) {
+	public static void render(PoseStack poseStack, float alpha) {
 		if (!built) {
 			build();
 		}
@@ -115,11 +117,11 @@ public final class FogVolume {
 		modelViewStack.mul(poseStack.last().pose());
 		modelViewStack.rotateY(drift);
 		GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms()
-				.writeTransform(modelViewStack, new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f());
+				.writeTransform(modelViewStack, new Vector4f(1.0F, 1.0F, 1.0F, alpha), new Vector3f(), new Matrix4f());
 
 		AbstractTexture texture = minecraft.getTextureManager().getTexture(TEXTURE);
-		GpuTextureView colorTexture = minecraft.getMainRenderTarget().getColorTextureView();
-		GpuTextureView depthTexture = minecraft.getMainRenderTarget().getDepthTextureView();
+		GpuTextureView colorTexture = SkyTarget.color(minecraft);
+		GpuTextureView depthTexture = SkyTarget.depth(minecraft);
 		try (RenderPass renderPass = RenderSystem.getDevice()
 				.createCommandEncoder()
 				.createRenderPass(() -> "SpaceFold fog volume", colorTexture, OptionalInt.empty(), depthTexture, OptionalDouble.empty())) {

@@ -201,8 +201,8 @@ public final class ShootingStars {
 				modelViewStack.mul(poseStack.last().pose());
 				GpuBufferSlice dynamicTransforms = RenderSystem.getDynamicUniforms()
 						.writeTransform(modelViewStack, new Vector4f(1.0F, 1.0F, 1.0F, 1.0F), new Vector3f(), new Matrix4f());
-				GpuTextureView colorTexture = minecraft.getMainRenderTarget().getColorTextureView();
-				GpuTextureView depthTexture = minecraft.getMainRenderTarget().getDepthTextureView();
+				GpuTextureView colorTexture = SkyTarget.color(minecraft);
+				GpuTextureView depthTexture = SkyTarget.depth(minecraft);
 				try (RenderPass renderPass = RenderSystem.getDevice()
 						.createCommandEncoder()
 						.createRenderPass(() -> "SpaceFold shooting stars", colorTexture, OptionalInt.empty(), depthTexture, OptionalDouble.empty())) {

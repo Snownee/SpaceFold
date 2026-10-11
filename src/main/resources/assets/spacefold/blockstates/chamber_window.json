@@ -1,0 +1,39 @@
+{
+	"variants": {
+		"facing=up": {
+			"model": "spacefold:block/chamber_window",
+			"x": 270
+		},
+		"facing=down": {
+			"model": "spacefold:block/chamber_window",
+			"x": 90
+		},
+		"facing=north": {
+			"model": "spacefold:block/chamber_window"
+		},
+		"facing=south": {
+			"model": "spacefold:block/chamber_window",
+			"y": 180
+		},
+		"facing=west": {
+			"model": "spacefold:block/chamber_window",
+			"y": 270
+		},
+		"facing=east": {
+			"model": "spacefold:block/chamber_window",
+			"y": 90
+		}
+	},
+	"athena:loader": "spacefold:facing_ctm",
+	"ctm_textures": {
+		"particle": "spacefold:block/chamber_window/particle",
+		"empty": "spacefold:block/empty",
+		"center": "spacefold:block/chamber_window/center",
+		"horizontal": "spacefold:block/chamber_window/horizontal",
+		"vertical": "spacefold:block/chamber_window/vertical"
+	},
+	"connect_to": {
+		"type": "tag",
+		"tag": "spacefold:chamber_windows"
+	}
+}

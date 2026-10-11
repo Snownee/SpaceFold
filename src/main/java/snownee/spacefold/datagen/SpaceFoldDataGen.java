@@ -10,5 +10,7 @@ public class SpaceFoldDataGen implements DataGeneratorEntrypoint {
 		FabricDataGenerator.Pack pack = fabricDataGenerator.createPack();
 		pack.addProvider(KiwiLanguageProvider::new);
 		pack.addProvider(SpaceFoldModels::new);
+		pack.addProvider(SpaceFoldRecipes::new);
+		pack.addProvider(SpaceFoldBlockTags::new);
 	}
 }

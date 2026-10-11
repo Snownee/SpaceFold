@@ -2,6 +2,7 @@ package snownee.spacefold.network;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerLevel;
@@ -15,7 +16,7 @@ import snownee.spacefold.dim.RoomManager;
 import snownee.spacefold.dim.Simulate;
 
 @KiwiPacket
-public record CSimulatorUsePacket(BlockPos pos) implements CustomPacketPayload {
+public record CSimulatorUsePacket(BlockPos pos, boolean windows) implements CustomPacketPayload {
 	public static final Type<CSimulatorUsePacket> TYPE = new Type<>(SpaceFold.id("simulator_use"));
 
 	@Override
@@ -24,8 +25,12 @@ public record CSimulatorUsePacket(BlockPos pos) implements CustomPacketPayload {
 	}
 
 	public static class Handler implements PlayPacketHandler<CSimulatorUsePacket> {
-		public static final StreamCodec<RegistryFriendlyByteBuf, CSimulatorUsePacket> STREAM_CODEC =
-				StreamCodec.composite(BlockPos.STREAM_CODEC, CSimulatorUsePacket::pos, CSimulatorUsePacket::new);
+		public static final StreamCodec<RegistryFriendlyByteBuf, CSimulatorUsePacket> STREAM_CODEC = StreamCodec.composite(
+				BlockPos.STREAM_CODEC,
+				CSimulatorUsePacket::pos,
+				ByteBufCodecs.BOOL,
+				CSimulatorUsePacket::windows,
+				CSimulatorUsePacket::new);
 
 		@Override
 		public void handle(CSimulatorUsePacket packet, PayloadContext payloadContext) {
@@ -35,14 +40,14 @@ public record CSimulatorUsePacket(BlockPos pos) implements CustomPacketPayload {
 				if (!level.dimension().equals(Simulate.DIMENSION)) {
 					return;
 				}
-				BlockPos pos = packet.pos;
+				BlockPos pos = packet.pos();
 				if (!(level.getBlockState(pos).getBlock() instanceof SimulatorBlock)) {
 					return;
 				}
 				if (!player.isWithinBlockInteractionRange(pos, 1.0D)) {
 					return;
 				}
-				RoomManager.useSimulator(level, player, pos);
+				RoomManager.useSimulator(level, player, pos, packet.windows());
 			});
 		}
 

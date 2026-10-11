@@ -17,7 +17,10 @@ public record SimulationResult(
 		List<Material> materials,
 		boolean failed,
 		Optional<String> failure,
-		int tier) {
+		int tier,
+		int snapshotId) {
+	public static final int NO_SNAPSHOT = -1;
+
 	public static final Codec<SimulationResult> CODEC = RecordCodecBuilder.create(i -> i.group(
 					Rates.CODEC.fieldOf("inputs")
 							.orElse(Rates.EMPTY)
@@ -35,11 +38,29 @@ public record SimulationResult(
 					Codec.STRING.optionalFieldOf("failure")
 							.forGetter(SimulationResult::failure),
 					Codec.INT.optionalFieldOf("tier", 1)
-							.forGetter(SimulationResult::tier))
+							.forGetter(SimulationResult::tier),
+					Codec.INT.optionalFieldOf("snapshot", NO_SNAPSHOT)
+							.forGetter(SimulationResult::snapshotId))
 			.apply(i, SimulationResult::new));
 
 	public SimulationResult(Rates inputs, Rates outputs, List<Material> materials, boolean failed) {
-		this(inputs, outputs, materials, failed, Optional.empty(), 1);
+		this(inputs, outputs, materials, failed, Optional.empty(), 1, NO_SNAPSHOT);
+	}
+
+	public SimulationResult(Rates inputs, Rates outputs, List<Material> materials, boolean failed, Optional<String> failure, int tier) {
+		this(inputs, outputs, materials, failed, failure, tier, NO_SNAPSHOT);
+	}
+
+	public boolean hasSnapshot() {
+		return snapshotId != NO_SNAPSHOT;
+	}
+
+	public SimulationResult withSnapshotId(int snapshotId) {
+		return new SimulationResult(inputs, outputs, materials, failed, failure, tier, snapshotId);
+	}
+
+	public static SimulationResult previewOnly(int snapshotId) {
+		return new SimulationResult(Rates.EMPTY, Rates.EMPTY, List.of(), false, Optional.empty(), 1, snapshotId);
 	}
 
 	public record Material(ItemVariant item, int count) {

@@ -34,16 +34,18 @@ public class SpaceFoldModels extends FabricModelProvider {
 
 	@Override
 	public void generateItemModels(ItemModelGenerators itemModelGenerators) {
-		generateCubeItemModel(itemModelGenerators, CoreModule.CHAMBER_WALL.get().asItem(), Identifier.withDefaultNamespace("block/stone"));
-		generateCubeItemModel(itemModelGenerators, CoreModule.INTERFACE.get().asItem(), SpaceFold.id("block/interface"));
+		generateCubeItemModel(itemModelGenerators, CoreModule.CHAMBER_WALL.asItem(), SpaceFold.id("block/chamber_wall"));
+		generateCubeItemModel(itemModelGenerators, CoreModule.CHAMBER_WINDOW.asItem(), SpaceFold.id("block/chamber_window/particle"));
+		generateCubeItemModel(itemModelGenerators, CoreModule.INTERFACE.asItem(), SpaceFold.id("block/interface"));
+		generateCubeItemModel(itemModelGenerators, CoreModule.INTERFACE_WINDOW.asItem(), SpaceFold.id("block/interface_window/particle"));
 		itemModelGenerators.itemModelOutput.accept(
-				CoreModule.SIMULATOR.get().asItem(),
+				CoreModule.SIMULATOR.asItem(),
 				ItemModelUtils.plainModel(ModelLocationUtils.getModelLocation(CoreModule.SIMULATOR.get())));
 		itemModelGenerators.itemModelOutput.accept(
-				CoreModule.REPEATER.get().asItem(),
+				CoreModule.REPEATER.asItem(),
 				ItemModelUtils.plainModel(ModelLocationUtils.getModelLocation(CoreModule.REPEATER.get())));
 		itemModelGenerators.itemModelOutput.accept(
-				CoreModule.FACTORY.get().asItem(),
+				CoreModule.FACTORY.asItem(),
 				ItemModelUtils.plainModel(ModelLocationUtils.getModelLocation(CoreModule.FACTORY.get())));
 		itemModelGenerators.generateFlatItem(CoreModule.OPENER.get(), ModelTemplates.FLAT_ITEM);
 	}

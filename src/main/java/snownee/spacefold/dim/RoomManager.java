@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
 
@@ -33,6 +34,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.portal.TeleportTransition;
 import net.minecraft.world.level.saveddata.SavedDataType;
+import net.minecraft.world.level.storage.SavedDataStorage;
 import net.minecraft.world.phys.Vec3;
 import snownee.kiwi.network.KPacketSender;
 import snownee.spacefold.CoreModule;
@@ -48,6 +50,7 @@ public final class RoomManager {
 	public static final int HIGHLIGHT_LIFE = 200;
 
 	private static final int TELEPORT_PRELOAD_RADIUS = 2;
+	private static final int MAX_SNAPSHOTS_PER_ROOM = 3;
 
 	private static final SavedDataType<PlanRooms> ROOMS = new SavedDataType<>(
 			SpaceFold.id("rooms"),
@@ -61,7 +64,7 @@ public final class RoomManager {
 	private RoomManager() {
 	}
 
-	public static void useSimulator(ServerLevel level, ServerPlayer player, BlockPos pos) {
+	public static void useSimulator(ServerLevel level, ServerPlayer player, BlockPos pos, boolean windows) {
 		SimulatorBlockEntity blockEntity = (SimulatorBlockEntity) Objects.requireNonNull(level.getBlockEntity(pos));
 		int room = blockEntity.getRoomIndex();
 		if (isRoomDimension(level.dimension())) {
@@ -83,13 +86,13 @@ public final class RoomManager {
 
 		ServerLevel plan = Objects.requireNonNull(level.getServer().getLevel(Plan.DIMENSION));
 		if (room < 0) {
-			room = allocate(plan);
+			room = allocate(plan, player.getUUID());
 			blockEntity.setRoom(room);
 		}
 		setSource(level, room, pos, level.dimension());
 		BlockPos inner = innerPos(room);
 		if (!(plan.getBlockState(inner).getBlock() instanceof SimulatorBlock)) {
-			buildRoom(plan, room);
+			buildRoom(plan, room, windows);
 		}
 		((SimulatorBlockEntity) Objects.requireNonNull(plan.getBlockEntity(inner))).setRoom(room);
 
@@ -124,6 +127,7 @@ public final class RoomManager {
 			KPacketSender.send(new SHighlightBlocksPacket(check.illegal(), HIGHLIGHT_COLOR, HIGHLIGHT_LIFE), player);
 			return false;
 		}
+		setInitiator(level, room, player.getUUID());
 		mirror(source, destination, room);
 		if (level.dimension().equals(Plan.DIMENSION)) {
 			GlobalPos ref = source(level, room);
@@ -143,10 +147,11 @@ public final class RoomManager {
 			int room,
 			ResourceKey<Level> sourceDim,
 			BlockPos sourcePos) {
-		preloadAndRun(simulateLevel, room, () -> {
-			SimulationManager.start(simulateLevel, room, sourceDim, sourcePos);
-			teleportIntoRoom(player, Plan.DIMENSION, Simulate.DIMENSION, room);
-		});
+		preloadAndRun(
+				simulateLevel, room, () -> {
+					SimulationManager.start(simulateLevel, room, sourceDim, sourcePos);
+					teleportIntoRoom(player, Plan.DIMENSION, Simulate.DIMENSION, room);
+				});
 	}
 
 	private static void preloadAndRun(ServerLevel level, int room, Runnable action) {
@@ -287,15 +292,16 @@ public final class RoomManager {
 		return list;
 	}
 
-	private static int allocate(ServerLevel plan) {
+	private static int allocate(ServerLevel plan, UUID creator) {
 		PlanRooms rooms = rooms(plan);
 		int index = rooms.nextIndex++;
+		rooms.rooms.put(index, roomData(rooms, index).withCreator(creator));
 		rooms.setDirty();
 		return index;
 	}
 
 	private static PlanRooms rooms(ServerLevel level) {
-		return level.getServer().overworld().getDataStorage().computeIfAbsent(ROOMS);
+		return level.getServer().getDataStorage().computeIfAbsent(ROOMS);
 	}
 
 	public static @Nullable GlobalPos source(ServerLevel level, int room) {
@@ -309,29 +315,101 @@ public final class RoomManager {
 	}
 
 	public static long lastStart(ServerLevel level, int room) {
-		return rooms(level).lastStarts.getOrDefault(room, 0L);
+		PlanRooms.RoomData data = rooms(level).rooms.get(room);
+		return data == null ? 0L : data.lastStart();
 	}
 
 	public static void setLastStart(ServerLevel level, int room, long time) {
 		PlanRooms rooms = rooms(level);
-		rooms.lastStarts.put(room, time);
+		rooms.rooms.put(room, roomData(rooms, room).withLastStart(time));
 		rooms.setDirty();
 	}
 
+	public static void setInitiator(ServerLevel level, int room, UUID initiator) {
+		PlanRooms rooms = rooms(level);
+		rooms.rooms.put(room, roomData(rooms, room).withInitiator(initiator));
+		rooms.setDirty();
+	}
+
+	public static @Nullable RoomSnapshot previewSnapshot(ServerLevel level, int room) {
+		return level.getServer().getDataStorage().get(RoomSnapshot.type(RoomSnapshot.previewId(room)));
+	}
+
+	public static void setPreviewSnapshot(ServerLevel level, int room, RoomSnapshot snapshot) {
+		level.getServer().getDataStorage().set(RoomSnapshot.type(RoomSnapshot.previewId(room)), snapshot);
+	}
+
 	public static @Nullable SimulationResult simulationResult(ServerLevel level, int room) {
-		return rooms(level).results.get(room);
+		PlanRooms.RoomData data = rooms(level).rooms.get(room);
+		if (data == null) {
+			return null;
+		}
+		SimulationResult result = data.result();
+		if (result == null) {
+			if (level.dimension().equals(Plan.DIMENSION)) {
+				RoomManager.setPreviewSnapshot(level, room, RoomManager.captureSnapshot(level, room));
+				result = SimulationResult.previewOnly(RoomSnapshot.previewId(room));
+			} else if (RoomManager.previewSnapshot(level, room) != null) {
+			 	result = SimulationResult.previewOnly(RoomSnapshot.previewId(room));
+			}
+		}
+		return result;
 	}
 
 	public static void setSimulationResult(ServerLevel level, int room, SimulationResult result) {
 		PlanRooms rooms = rooms(level);
-		rooms.results.put(room, result);
+		rooms.rooms.put(room, roomData(rooms, room).withResult(result));
 		rooms.setDirty();
 	}
 
 	public static void clearSimulationResult(ServerLevel level, int room) {
 		PlanRooms rooms = rooms(level);
-		rooms.results.remove(room);
+		PlanRooms.RoomData data = rooms.rooms.get(room);
+		if (data == null || data.result() == null) {
+			return;
+		}
+		rooms.rooms.put(room, data.withResult(null));
 		rooms.setDirty();
+	}
+
+	private static PlanRooms.RoomData roomData(PlanRooms rooms, int room) {
+		PlanRooms.RoomData data = rooms.rooms.get(room);
+		return data == null ? new PlanRooms.RoomData(null, null, null, 0L) : data;
+	}
+
+	public static RoomSnapshot captureSnapshot(ServerLevel level, int room) {
+		return RoomSnapshot.capture(level, room, roomOrigin(room), Plan.ROOM_SIZE);
+	}
+
+	public static int allocateSnapshot(ServerLevel level, RoomSnapshot snapshot) {
+		PlanRooms rooms = rooms(level);
+		SavedDataStorage storage = level.getServer().getDataStorage();
+		List<Integer> existing = rooms.snapshots.get(snapshot.room());
+		if (existing != null) {
+			for (int i = existing.size() - 1; i >= 0; i--) {
+				int id = existing.get(i);
+				if (snapshot.equals(storage.get(RoomSnapshot.type(id)))) {
+					return id;
+				}
+			}
+		}
+		int id = rooms.nextSnapshotId++;
+		List<Integer> ids = existing == null ? new ArrayList<>() : new ArrayList<>(existing);
+		ids.add(id);
+		while (ids.size() > MAX_SNAPSHOTS_PER_ROOM) {
+			ids.remove(0);
+		}
+		rooms.snapshots.put(snapshot.room(), ids);
+		rooms.setDirty();
+		storage.set(RoomSnapshot.type(id), snapshot);
+		return id;
+	}
+
+	public static @Nullable RoomSnapshot snapshot(ServerLevel level, int id) {
+		if (id < 0) {
+			return null;
+		}
+		return level.getServer().getDataStorage().get(RoomSnapshot.type(id));
 	}
 
 	public static BlockPos roomOrigin(int room) {
@@ -342,19 +420,22 @@ public final class RoomManager {
 		return roomOrigin(room).offset(Plan.INNER_POS_OFFSET);
 	}
 
-	private static void buildRoom(ServerLevel plan, int room) {
+	private static void buildRoom(ServerLevel plan, int room, boolean windows) {
 		BlockPos origin = roomOrigin(room);
 		plan.getChunkAt(origin);
 		BlockPos inner = innerPos(room);
 		RoomProtection.runInternal(() -> {
 			BlockState wall = CoreModule.CHAMBER_WALL.get().defaultBlockState();
+			BlockState window = windows ? CoreModule.CHAMBER_WINDOW.get().defaultBlockState() : wall;
 			BlockState air = Blocks.AIR.defaultBlockState();
 			int flags = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
 			for (int dx = 0; dx < Plan.ROOM_SIZE; dx++) {
 				for (int dy = 0; dy < Plan.ROOM_SIZE; dy++) {
 					for (int dz = 0; dz < Plan.ROOM_SIZE; dz++) {
 						Direction facing = inwardDirection(dx, dy, dz);
-						BlockState state = facing == null ? air : wall.setValue(ChamberWallBlock.FACING, facing);
+						BlockState state = facing == null ? air : (facing == Direction.UP ? wall : window).setValue(
+								ChamberWallBlock.FACING,
+								facing);
 						plan.setBlock(origin.offset(dx, dy, dz), state, flags);
 					}
 				}

@@ -12,6 +12,7 @@ import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
 import net.fabricmc.fabric.api.client.particle.v1.ParticleGroupRegistry;
 import net.fabricmc.fabric.api.client.particle.v1.ParticleProviderRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.ClientTooltipComponentCallback;
+import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
@@ -30,12 +31,16 @@ import net.minecraft.world.item.TooltipFlag;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
 import snownee.spacefold.client.ClientSimulationTooltip;
+import snownee.spacefold.client.FacingCtmModel;
 import snownee.spacefold.client.FactoryScreen;
+import snownee.spacefold.client.ViewDetailsKey;
 import snownee.spacefold.client.RepeaterScreen;
 import snownee.spacefold.client.SimulationHud;
 import snownee.spacefold.client.SimulationTooltip;
 import snownee.spacefold.client.SimulatorScreen;
 import snownee.spacefold.client.paint.PaintAtlas;
+import snownee.spacefold.client.room.RoomSkyRenderer;
+import snownee.spacefold.client.room.VoxelRoomRenderer;
 import snownee.spacefold.client.paint.PaintRoot;
 import snownee.spacefold.client.paint.RepeaterPaintSpecialRenderer;
 import snownee.spacefold.client.particle.CubeParticle;
@@ -56,10 +61,12 @@ public class ClientProxy implements ClientModInitializer {
 			addSection(lines, "gui.spacefold.inputs", result.inputs());
 			addSection(lines, "gui.spacefold.outputs", result.outputs());
 		}
+		float progress = ViewDetailsKey.progress();
+		int shade = 0xAA + Math.round((0xFF - 0xAA) * progress);
 		lines.add(Component.translatable(
 				"gui.spacefold.repeater_materials_hint",
-				Component.keybind("key.sneak"),
-				Component.keybind("key.use")));
+				Component.keybind("key.spacefold.view_details"))
+				.withColor(shade << 16 | shade << 8 | shade));
 	}
 
 	private static void addSection(List<Component> lines, String header, SimulationResult.Rates rates) {
@@ -90,6 +97,8 @@ public class ClientProxy implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		ViewDetailsKey.register();
+		FacingCtmModel.register();
 		MenuScreens.register(CoreModule.SIMULATOR_MENU.getOrCreate(), SimulatorScreen::new);
 		MenuScreens.register(CoreModule.FACTORY_MENU.getOrCreate(), FactoryScreen::new);
 		MenuScreens.register(CoreModule.REPEATER_MENU.getOrCreate(), RepeaterScreen::new);
@@ -102,6 +111,8 @@ public class ClientProxy implements ClientModInitializer {
 		ClientTooltipComponentCallback.EVENT.register(component -> component instanceof SimulationTooltip tooltip
 				? new ClientSimulationTooltip(tooltip)
 				: null);
+		PictureInPictureRendererRegistry.register(context -> new VoxelRoomRenderer(context.bufferSource()));
+		PictureInPictureRendererRegistry.register(context -> new RoomSkyRenderer(context.bufferSource()));
 		SpecialModelRenderers.ID_MAPPER.put(SpaceFold.id("repeater_paint"), RepeaterPaintSpecialRenderer.Unbaked.MAP_CODEC);
 		ModelLoadingPlugin.register(context -> {
 			context.modifyBlockModelOnLoad().register((model, ctx) -> {

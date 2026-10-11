@@ -163,7 +163,8 @@ public class RepeaterContainer implements Container {
 						collectMaterials(RepeaterMenu.MATERIAL_SIGN + 1),
 						false,
 						Optional.empty(),
-						base == null ? 1 : base.tier()));
+						base == null ? 1 : base.tier(),
+						base == null ? SimulationResult.NO_SNAPSHOT : base.snapshotId()));
 	}
 
 	@Override
@@ -229,7 +230,10 @@ public class RepeaterContainer implements Container {
 
 	@Override
 	public boolean stillValid(Player player) {
-		return source == null || player.getMainHandItem() == source || player.getOffhandItem() == source;
+		return source == null
+				|| player.getInventory().contains(source)
+				|| player.getMainHandItem() == source
+				|| player.getOffhandItem() == source;
 	}
 
 	@Override

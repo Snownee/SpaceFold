@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "key": {
+    "A": "minecraft:amethyst_shard",
+    "E": "minecraft:ender_pearl",
+    "I": "minecraft:iron_ingot"
+  },
+  "pattern": [
+    "  A",
+    " E ",
+    "I  "
+  ],
+  "result": {
+    "id": "spacefold:opener"
+  }
+}

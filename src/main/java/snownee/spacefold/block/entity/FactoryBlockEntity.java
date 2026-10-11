@@ -31,7 +31,7 @@ import snownee.kiwi.block.entity.ModBlockEntity;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFoldConfig;
 import snownee.spacefold.dim.SimulationResult;
-import snownee.spacefold.network.SFactoryMaterialsPacket;
+import snownee.spacefold.network.SViewDetailsPacket;
 import snownee.spacefold.paint.FacePaint;
 import snownee.spacefold.paint.RepeaterPaints;
 import team.reborn.energy.api.EnergyStorage;
@@ -167,16 +167,20 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 		return total * progress / duration;
 	}
 
-	public List<SFactoryMaterialsPacket.Entry> materialProgresses() {
+	public int templateSnapshotId() {
+		return templateResult == null ? SimulationResult.NO_SNAPSHOT : templateResult.snapshotId();
+	}
+
+	public List<SViewDetailsPacket.Entry> materialProgresses() {
 		if (templateResult == null) {
 			return List.of();
 		}
 		int amount = Math.max(1, SpaceFoldConfig.factoryOutputPerCraft);
-		List<SFactoryMaterialsPacket.Entry> entries = new ArrayList<>();
+		List<SViewDetailsPacket.Entry> entries = new ArrayList<>();
 		for (SimulationResult.Material material : templateResult.materials()) {
 			long total = (long) material.count() * amount;
 			long provided = Math.min(total, materials.getLong(material.item()) + consumedAmount(material.item()));
-			entries.add(new SFactoryMaterialsPacket.Entry(material.item(), provided, total));
+			entries.add(new SViewDetailsPacket.Entry(material.item(), provided, total));
 		}
 		return entries;
 	}
@@ -283,6 +287,15 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 			return false;
 		}
 		return output.getCount() + amount <= max;
+	}
+
+	public boolean creativeInstantProduce() {
+		if (errorCode != ERROR_NONE || templateResult == null || !canProduce()) {
+			return false;
+		}
+		progress = 0;
+		produce();
+		return true;
 	}
 
 	private void produce() {

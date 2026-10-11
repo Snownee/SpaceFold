@@ -2,6 +2,7 @@ package snownee.spacefold.menu;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.permissions.Permissions;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -22,6 +23,12 @@ public class RepeaterMenu extends AbstractContainerMenu {
 
 	public RepeaterMenu(int containerId, Inventory inventory, ItemStack stack) {
 		this(containerId, inventory, new RepeaterContainer(stack));
+	}
+
+	public static boolean canConfigure(Player player, ItemStack stack) {
+		return player.isCreative()
+				&& player.permissions().hasPermission(Permissions.COMMANDS_GAMEMASTER)
+				&& player.getInventory().contains(stack);
 	}
 
 	public RepeaterMenu(int containerId, Inventory inventory) {

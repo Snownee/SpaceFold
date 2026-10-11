@@ -10,10 +10,13 @@
 		"ServerPlayerMixin"
 	],
 	"client": [
+		"client.AbstractContainerScreenMixin",
 		"client.ClientPacketListenerMixin",
 		"client.ItemStackMixin",
+		"client.LevelRendererMixin",
 		"client.LocalPlayerMixin",
 		"client.MultiPlayerGameModeMixin",
+		"client.PictureInPictureRendererAccessor",
 		"client.SkyRendererMixin",
 		"client.TextureAtlasSpriteInvoker"
 	],

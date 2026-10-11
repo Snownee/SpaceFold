@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import snownee.spacefold.block.entity.InterfaceBlockEntity;
+import snownee.spacefold.dim.Simulate;
 
 public class InterfaceBlock extends ChamberWallBlock implements EntityBlock {
 	public static final MapCodec<InterfaceBlock> CODEC = simpleCodec(InterfaceBlock::new);
@@ -33,7 +34,7 @@ public class InterfaceBlock extends ChamberWallBlock implements EntityBlock {
 
 	@Override
 	public <T extends BlockEntity> @Nullable BlockEntityTicker<T> getTicker(Level level, BlockState blockState, BlockEntityType<T> type) {
-		if (level.isClientSide()) {
+		if (level.isClientSide() || !level.dimension().equals(Simulate.DIMENSION)) {
 			return null;
 		}
 		return (tickLevel, pos, state, blockEntity) -> ((InterfaceBlockEntity) blockEntity).tick();

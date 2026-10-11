@@ -12,6 +12,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.phys.BlockHitResult;
 import snownee.kiwi.network.KPacketSender;
+import snownee.spacefold.SpaceFoldClientConfig;
 import snownee.spacefold.block.SimulatorBlock;
 import snownee.spacefold.dim.Simulate;
 import snownee.spacefold.network.CSimulatorUsePacket;
@@ -34,7 +35,7 @@ public abstract class MultiPlayerGameModeMixin {
 		if (!(player.level().getBlockState(pos).getBlock() instanceof SimulatorBlock)) {
 			return;
 		}
-		KPacketSender.sendToServer(new CSimulatorUsePacket(pos));
+		KPacketSender.sendToServer(new CSimulatorUsePacket(pos, SpaceFoldClientConfig.roomWindows));
 		cir.setReturnValue(InteractionResult.CONSUME);
 	}
 }

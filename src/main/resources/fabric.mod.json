@@ -25,6 +25,7 @@
 	"accessWidener": "spacefold.classtweaker",
 	"depends": {
 		"kiwi": ">=26",
+		"athena": "*",
 		"xercapaint": "*"
 	},
 	"suggests": {

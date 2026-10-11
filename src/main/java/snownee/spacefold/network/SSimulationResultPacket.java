@@ -10,7 +10,9 @@ import snownee.kiwi.network.KiwiPacket;
 import snownee.kiwi.network.PayloadContext;
 import snownee.kiwi.network.PlayPacketHandler;
 import snownee.spacefold.SpaceFold;
+import snownee.spacefold.client.PreviewCache;
 import snownee.spacefold.client.SimulatorScreen;
+import snownee.spacefold.dim.RoomSnapshot;
 import snownee.spacefold.dim.SimulationResult;
 
 @KiwiPacket
@@ -42,7 +44,12 @@ public record SSimulationResultPacket(int containerId, @Nullable SimulationResul
 
 		@Override
 		public void handle(SSimulationResultPacket packet, PayloadContext context) {
-			context.execute(() -> SimulatorScreen.acceptResult(packet.containerId(), packet.result()));
+			context.execute(() -> {
+				if (packet.result() != null && RoomSnapshot.isPreviewId(packet.result().snapshotId())) {
+					PreviewCache.invalidate(packet.result().snapshotId());
+				}
+				SimulatorScreen.acceptResult(packet.containerId(), packet.result());
+			});
 		}
 
 		@Override

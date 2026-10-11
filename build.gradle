@@ -60,6 +60,7 @@ dependencies {
     include "teamreborn:energy:${project.energy_version}"
 
     implementation "maven.modrinth:joy-of-painting:26.1.2-1.0.0"
+    implementation "maven.modrinth:athena-ctm:${project.athena_version}"
 
     runtimeOnly "maven.modrinth:techreborn:${project.techreborn_version}"
     runtimeOnly "maven.modrinth:orthocamera:0.1.10+26.1"

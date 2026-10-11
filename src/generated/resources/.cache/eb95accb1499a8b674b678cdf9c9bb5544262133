@@ -1,10 +1,14 @@
 // 26.1.2	-999999999-01-01T00:00:00	Space Fold/Model Definitions
 6e2cfb328810fb6008c86c2f832084f7372ced65 assets/spacefold/items/chamber_wall.json
+09a410cefcd44fa629ee17198a88f64ab3bfb83c assets/spacefold/items/chamber_window.json
 5a8f015727c035f6830afcd2073dc1afb640d53e assets/spacefold/items/factory.json
 fd62e4e88e806292ae5e5b1491d3d780dcbf726d assets/spacefold/items/interface.json
+4e38f45c7c37a49e6b45fdc213376b604f5abca2 assets/spacefold/items/interface_window.json
 090a08641f3fb337c630f27579fc9b7f5711d9b2 assets/spacefold/items/opener.json
 fcbdc9ebffcbb731a669004f2c8246ec70f31b9c assets/spacefold/items/repeater.json
 dd39eb260cdc8f748a64c37a4215c337f1ea9086 assets/spacefold/items/simulator.json
-bd721385e8bb8bf981c7a5e7a4d54ecf81cbcfc4 assets/spacefold/models/item/chamber_wall.json
+01212f9cae245b1ab8cf8c2641162623243c54e0 assets/spacefold/models/item/chamber_wall.json
+9b80f1a5c7aa08ba0372c8d6091619cd938c7e83 assets/spacefold/models/item/chamber_window.json
 98c29b15f4fd1c1537a7921bc2c2cae3598a255e assets/spacefold/models/item/interface.json
+69a4bf07aef7b596fdc331a2677d350aa8123a69 assets/spacefold/models/item/interface_window.json
 b04375e9705379e64aaeaa272b2b1a568c40afc6 assets/spacefold/models/item/opener.json

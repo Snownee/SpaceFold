@@ -47,7 +47,7 @@ public abstract class SkyRendererMixin {
 		if (!spacefold$isRoomDimension()) {
 			return;
 		}
-		FogVolume.render(poseStack);
+		FogVolume.render(poseStack, 1.0F);
 		poseStack.pushPose();
 		poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F));
 		poseStack.mulPose(Axis.XP.rotation(starAngle));

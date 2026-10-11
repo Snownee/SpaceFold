@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "E": "minecraft:ender_eye",
+    "M": "spacefold:chamber_wall",
+    "O": "minecraft:crying_obsidian"
+  },
+  "pattern": [
+    "MOM",
+    "OEO",
+    "MOM"
+  ],
+  "result": {
+    "id": "spacefold:simulator"
+  }
+}

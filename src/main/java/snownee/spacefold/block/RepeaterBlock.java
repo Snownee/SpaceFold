@@ -13,11 +13,8 @@ import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.Level;
+import net.minecraft.world.item.context.BlockPlaceContext;import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.DirectionalBlock;
@@ -35,7 +32,6 @@ import snownee.kiwi.block.IKiwiBlock;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.block.entity.RepeaterBlockEntity;
 import snownee.spacefold.dim.SimulationResult;
-import snownee.spacefold.item.RepeaterItem;
 import snownee.spacefold.paint.FacePaint;
 
 public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiwiBlock {
@@ -64,11 +60,6 @@ public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiw
 	@Override
 	protected MapCodec<? extends DirectionalBlock> codec() {
 		return CODEC;
-	}
-
-	@Override
-	public BlockItem createItem(Item.Properties builder) {
-		return new RepeaterItem(this, builder);
 	}
 
 	@Override

@@ -38,6 +38,7 @@ public class ChamberWallBlock extends DirectionalBlock {
 				.noOcclusion()
 				.noLootTable()
 				.dynamicShape()
+				.forceSolidOn()
 				.isSuffocating(Blocks::never)
 				.isViewBlocking(Blocks::never)
 				.noTerrainParticles();

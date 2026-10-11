@@ -31,8 +31,18 @@ public class OpenerItem extends Item {
 					.defaultBlockState()
 					.setValue(ChamberWallBlock.FACING, state.getValue(InterfaceBlock.FACING));
 		}
+		if (block == CoreModule.INTERFACE_WINDOW.get()) {
+			return CoreModule.CHAMBER_WINDOW.get()
+					.defaultBlockState()
+					.setValue(ChamberWallBlock.FACING, state.getValue(InterfaceBlock.FACING));
+		}
 		if (block == CoreModule.CHAMBER_WALL.get()) {
 			return CoreModule.INTERFACE.get()
+					.defaultBlockState()
+					.setValue(InterfaceBlock.FACING, state.getValue(ChamberWallBlock.FACING));
+		}
+		if (block == CoreModule.CHAMBER_WINDOW.get()) {
+			return CoreModule.INTERFACE_WINDOW.get()
 					.defaultBlockState()
 					.setValue(InterfaceBlock.FACING, state.getValue(ChamberWallBlock.FACING));
 		}

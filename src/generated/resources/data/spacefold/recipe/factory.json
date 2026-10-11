@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "key": {
+    "A": "minecraft:amethyst_shard",
+    "I": "minecraft:iron_ingot",
+    "R": "spacefold:repeater"
+  },
+  "pattern": [
+    "IAI",
+    "ARA",
+    "IAI"
+  ],
+  "result": {
+    "id": "spacefold:factory"
+  }
+}

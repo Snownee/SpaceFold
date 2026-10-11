@@ -99,6 +99,7 @@ public final class SimulationManager {
 				startTime,
 				startTime + SpaceFoldConfig.simulationDuration * 20L,
 				materials(simulate, room),
+				RoomManager.captureSnapshot(simulate, room),
 				sourceDim,
 				sourcePos,
 				collectInterfaces(simulate, room),
@@ -375,6 +376,10 @@ public final class SimulationManager {
 		setChunksLoaded(server, session, false);
 		boolean blocksChanged = !materials(simulate, room).equals(session.materials());
 		SimulationResult simulationResult = result(session, blocksChanged, tier(simulate, room));
+		if (!simulationResult.failed()) {
+			int snapshotId = RoomManager.allocateSnapshot(simulate, session.snapshot());
+			simulationResult = simulationResult.withSnapshotId(snapshotId);
+		}
 		RoomManager.setSimulationResult(simulate, room, simulationResult);
 		send(server, simulate, session, room, packet(session, session.endTime()));
 		List<ServerPlayer> players = new ArrayList<>();
@@ -631,6 +636,7 @@ public final class SimulationManager {
 			long startTime,
 			long endTime,
 			List<SimulationResult.Material> materials,
+			RoomSnapshot snapshot,
 			@Nullable ResourceKey<Level> sourceDim,
 			@Nullable BlockPos sourcePos,
 			BlockPos[] targets,

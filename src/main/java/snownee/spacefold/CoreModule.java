@@ -17,6 +17,7 @@ import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import snownee.kiwi.AbstractModule;
@@ -43,16 +44,20 @@ import snownee.spacefold.paint.FacePaint;
 import snownee.spacefold.paint.RepeaterPaints;
 import snownee.spacefold.particle.CubeParticleOptions;
 import snownee.spacefold.particle.CubeParticleType;
+import snownee.spacefold.recipe.SimulationSlotDisplay;
 import team.reborn.energy.api.EnergyStorage;
 
-@KiwiModule
+@KiwiModule(modId = SpaceFold.ID)
 @KiwiModule.Category("spacefold:main")
 public final class CoreModule extends AbstractModule {
-	public static final TagKey<Block> ROOM_INVALID = TagKey.create(Registries.BLOCK, SpaceFold.id("room_invalid"));
-	public static final TagKey<Block> ROOM_IGNORED = TagKey.create(Registries.BLOCK, SpaceFold.id("room_ignored"));
+	public static final TagKey<Block> ROOM_INVALID = blockTag("room_invalid");
+	public static final TagKey<Block> ROOM_IGNORED = blockTag("room_ignored");
+	public static final TagKey<Block> CHAMBER_WINDOWS = blockTag("chamber_windows");
 
 	public static final BlockObject<ChamberWallBlock> CHAMBER_WALL = block(ChamberWallBlock::new);
+	public static final BlockObject<ChamberWallBlock> CHAMBER_WINDOW = block(ChamberWallBlock::new);
 	public static final BlockObject<InterfaceBlock> INTERFACE = block(InterfaceBlock::new);
+	public static final BlockObject<InterfaceBlock> INTERFACE_WINDOW = block(InterfaceBlock::new);
 	public static final BlockObject<SimulatorBlock> SIMULATOR = block(SimulatorBlock::new);
 	public static final BlockObject<RepeaterBlock> REPEATER = block(RepeaterBlock::new);
 	public static final BlockObject<FactoryBlock> FACTORY = block(FactoryBlock::new);
@@ -101,6 +106,10 @@ public final class CoreModule extends AbstractModule {
 	public static final KiwiGO<CreativeModeTab> TAB = go(() -> itemCategory(
 			Identifier.fromNamespaceAndPath(SpaceFold.ID, "main"),
 			() -> new ItemStack(CoreModule.REPEATER)).build());
+	@KiwiModule.Name("simulation")
+	public static final KiwiGO<SlotDisplay.Type<SimulationSlotDisplay>> SIMULATION_DISPLAY = go(
+			() -> SimulationSlotDisplay.TYPE,
+			Registries.SLOT_DISPLAY);
 
 	@Override
 	protected void init(InitEvent event) {
@@ -127,7 +136,8 @@ public final class CoreModule extends AbstractModule {
 	@KiwiModule.Name("interface")
 	public static final KiwiGO<BlockEntityType<InterfaceBlockEntity>> INTERFACE_BE = blockEntity(
 			InterfaceBlockEntity::new,
-			INTERFACE::getOrCreate);
+			INTERFACE::getOrCreate,
+			INTERFACE_WINDOW::getOrCreate);
 	@KiwiModule.Name("repeater")
 	public static final KiwiGO<BlockEntityType<RepeaterBlockEntity>> REPEATER_BE = blockEntity(
 			RepeaterBlockEntity::new,

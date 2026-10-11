@@ -10,14 +10,14 @@ import net.minecraft.world.inventory.tooltip.TooltipComponent;
 import net.minecraft.world.item.ItemStack;
 import snownee.spacefold.dim.SimulationResult;
 
-public record SimulationTooltip(List<Entry> inputs, List<Entry> outputs) implements TooltipComponent {
+public record SimulationTooltip(List<Entry> inputs, List<Entry> outputs, int snapshotId) implements TooltipComponent {
 	public static @Nullable SimulationTooltip of(SimulationResult result) {
 		List<Entry> inputs = toEntries(result.inputs());
 		List<Entry> outputs = toEntries(result.outputs());
-		if (inputs.isEmpty() && outputs.isEmpty()) {
+		if (inputs.isEmpty() && outputs.isEmpty() && !result.hasSnapshot()) {
 			return null;
 		}
-		return new SimulationTooltip(inputs, outputs);
+		return new SimulationTooltip(inputs, outputs, result.snapshotId());
 	}
 
 	private static List<Entry> toEntries(SimulationResult.Rates rates) {

@@ -1,8 +1,7 @@
 {
 	"ambientocclusion": false,
 	"textures": {
-		"particle": "minecraft:block/stone",
-		"all": "minecraft:block/stone"
+		"particle": "spacefold:block/chamber_wall"
 	},
 	"elements": [
 		{
@@ -18,7 +17,7 @@
 			],
 			"faces": {
 				"north": {
-					"texture": "#all",
+					"texture": "#particle",
 					"uv": [
 						0,
 						0,

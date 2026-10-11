@@ -1,0 +1,9 @@
+// 26.1.2	-999999999-01-01T00:00:00	Space Fold/Space Fold - Recipes
+ee7123aa952b8b09f9288deaf36f3a3cef7da9b6 data/spacefold/advancement/recipes/misc/factory.json
+884efb9f652d4dfd80d0ce7d6b195bb50752f73e data/spacefold/advancement/recipes/misc/repeater.json
+794881de88dfe2532b0fb2eb636e40a1b0470e38 data/spacefold/advancement/recipes/misc/simulator.json
+66d4db0a6202ee97b838d6095747e1cb9df980bb data/spacefold/advancement/recipes/tools/opener.json
+b0ce95fced320ba906b4d426e1e7d684aef93059 data/spacefold/recipe/factory.json
+5219ffa3a34d451c3d371f2ad2202c5f23e88a80 data/spacefold/recipe/opener.json
+21fb727c9caab496b78ddd63caa88e4928c6f0e1 data/spacefold/recipe/repeater.json
+ceed28daf987ced1a7e726e41c5473ce7f4d1acf data/spacefold/recipe/simulator.json
