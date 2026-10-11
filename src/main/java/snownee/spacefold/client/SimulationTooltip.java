@@ -12,12 +12,17 @@ import snownee.spacefold.dim.SimulationResult;
 
 public record SimulationTooltip(List<Entry> inputs, List<Entry> outputs, int snapshotId) implements TooltipComponent {
 	public static @Nullable SimulationTooltip of(SimulationResult result) {
-		List<Entry> inputs = toEntries(result.inputs());
-		List<Entry> outputs = toEntries(result.outputs());
-		if (inputs.isEmpty() && outputs.isEmpty() && !result.hasSnapshot()) {
+		return of(result, true, true);
+	}
+
+	public static @Nullable SimulationTooltip of(SimulationResult result, boolean showEntries, boolean showSnapshot) {
+		List<Entry> inputs = showEntries ? toEntries(result.inputs()) : List.of();
+		List<Entry> outputs = showEntries ? toEntries(result.outputs()) : List.of();
+		int snapshotId = showSnapshot ? result.snapshotId() : SimulationResult.NO_SNAPSHOT;
+		if (inputs.isEmpty() && outputs.isEmpty() && snapshotId == SimulationResult.NO_SNAPSHOT) {
 			return null;
 		}
-		return new SimulationTooltip(inputs, outputs, result.snapshotId());
+		return new SimulationTooltip(inputs, outputs, snapshotId);
 	}
 
 	private static List<Entry> toEntries(SimulationResult.Rates rates) {

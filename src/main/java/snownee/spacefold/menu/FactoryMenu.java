@@ -53,7 +53,11 @@ public class FactoryMenu extends AbstractContainerMenu {
 	public boolean clickMenuButton(Player player, int buttonId) {
 		if (buttonId == BUTTON_MATERIALS && player instanceof ServerPlayer serverPlayer &&
 				container instanceof FactoryBlockEntity factory) {
-			KPacketSender.send(new SViewDetailsPacket(factory.materialProgresses(), true, factory.templateSnapshotId()), serverPlayer);
+			KPacketSender.send(new SViewDetailsPacket(
+					factory.materialProgresses(),
+					true,
+					factory.templateSnapshotId(),
+					factory.getItem(FactoryBlockEntity.TEMPLATE_SLOT)), serverPlayer);
 			return true;
 		}
 		if (buttonId == BUTTON_CREATE && player.isCreative() && container instanceof FactoryBlockEntity factory) {

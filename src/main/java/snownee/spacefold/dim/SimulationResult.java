@@ -22,25 +22,15 @@ public record SimulationResult(
 	public static final int NO_SNAPSHOT = -1;
 
 	public static final Codec<SimulationResult> CODEC = RecordCodecBuilder.create(i -> i.group(
-					Rates.CODEC.fieldOf("inputs")
-							.orElse(Rates.EMPTY)
-							.forGetter(SimulationResult::inputs),
-					Rates.CODEC.fieldOf("outputs")
-							.orElse(Rates.EMPTY)
-							.forGetter(SimulationResult::outputs),
+					Rates.CODEC.optionalFieldOf("inputs", Rates.EMPTY).forGetter(SimulationResult::inputs),
+					Rates.CODEC.optionalFieldOf("outputs", Rates.EMPTY).forGetter(SimulationResult::outputs),
 					Material.CODEC.listOf()
-							.fieldOf("materials")
-							.orElse(List.of())
+							.optionalFieldOf("materials", List.of())
 							.forGetter(SimulationResult::materials),
-					Codec.BOOL.fieldOf("failed")
-							.orElse(false)
-							.forGetter(SimulationResult::failed),
-					Codec.STRING.optionalFieldOf("failure")
-							.forGetter(SimulationResult::failure),
-					Codec.INT.optionalFieldOf("tier", 1)
-							.forGetter(SimulationResult::tier),
-					Codec.INT.optionalFieldOf("snapshot", NO_SNAPSHOT)
-							.forGetter(SimulationResult::snapshotId))
+					Codec.BOOL.optionalFieldOf("failed", false).forGetter(SimulationResult::failed),
+					Codec.STRING.optionalFieldOf("failure").forGetter(SimulationResult::failure),
+					Codec.INT.optionalFieldOf("tier", 1).forGetter(SimulationResult::tier),
+					Codec.INT.optionalFieldOf("snapshot", NO_SNAPSHOT).forGetter(SimulationResult::snapshotId))
 			.apply(i, SimulationResult::new));
 
 	public SimulationResult(Rates inputs, Rates outputs, List<Material> materials, boolean failed) {
@@ -76,16 +66,12 @@ public record SimulationResult(
 		public static final Rates EMPTY = new Rates(Map.of(), Map.of(), 0);
 		public static final Codec<Rates> CODEC = RecordCodecBuilder.create(i -> i.group(
 						ItemRate.CODEC.listOf()
-								.fieldOf("items")
-								.orElse(List.of())
+								.optionalFieldOf("items", List.of())
 								.forGetter(Rates::itemList),
 						FluidRate.CODEC.listOf()
-								.fieldOf("fluids")
-								.orElse(List.of())
+								.optionalFieldOf("fluids", List.of())
 								.forGetter(Rates::fluidList),
-						Codec.DOUBLE.fieldOf("energy")
-								.orElse(0.0)
-								.forGetter(Rates::energy))
+						Codec.DOUBLE.optionalFieldOf("energy", 0.0).forGetter(Rates::energy))
 				.apply(i, Rates::fromLists));
 
 		private static Rates fromLists(List<ItemRate> items, List<FluidRate> fluids, double energy) {
@@ -114,19 +100,15 @@ public record SimulationResult(
 
 		private record ItemRate(ItemVariant item, double rate) {
 			static final Codec<ItemRate> CODEC = RecordCodecBuilder.create(i -> i.group(
-							ItemVariant.CODEC.fieldOf("item")
-									.forGetter(ItemRate::item),
-							Codec.DOUBLE.fieldOf("rate")
-									.forGetter(ItemRate::rate))
+							ItemVariant.CODEC.fieldOf("item").forGetter(ItemRate::item),
+							Codec.DOUBLE.fieldOf("rate").forGetter(ItemRate::rate))
 					.apply(i, ItemRate::new));
 		}
 
 		private record FluidRate(FluidVariant fluid, double rate) {
 			static final Codec<FluidRate> CODEC = RecordCodecBuilder.create(i -> i.group(
-							FluidVariant.CODEC.fieldOf("fluid")
-									.forGetter(FluidRate::fluid),
-							Codec.DOUBLE.fieldOf("rate")
-									.forGetter(FluidRate::rate))
+							FluidVariant.CODEC.fieldOf("fluid").forGetter(FluidRate::fluid),
+							Codec.DOUBLE.fieldOf("rate").forGetter(FluidRate::rate))
 					.apply(i, FluidRate::new));
 		}
 	}

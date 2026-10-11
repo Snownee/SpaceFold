@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.joml.Matrix3x2f;
 import org.jspecify.annotations.Nullable;
 
 import net.minecraft.client.Minecraft;
@@ -13,9 +14,11 @@ import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.state.gui.pip.PictureInPictureRenderState;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import snownee.spacefold.SpaceFoldClientConfig;
+import snownee.spacefold.client.PreviewCache;
 import snownee.spacefold.dim.RoomSnapshot;
 
 public record VoxelRoomRenderState(
@@ -23,12 +26,13 @@ public record VoxelRoomRenderState(
 		Map<Integer, CompoundTag> blockEntities,
 		int size,
 		int snapshotId,
+		int version,
 		float yaw,
 		float pitch,
-		int x0,
-		int y0,
-		int x1,
-		int y1,
+		float x,
+		float y,
+		float w,
+		float h,
 		float scale,
 		float alpha,
 		@Nullable ScreenRectangle scissorArea,
@@ -38,12 +42,13 @@ public record VoxelRoomRenderState(
 			Map<Integer, CompoundTag> blockEntities,
 			int size,
 			int snapshotId,
+			int version,
 			float yaw,
 			float pitch,
-			int x0,
-			int y0,
-			int x1,
-			int y1,
+			float x,
+			float y,
+			float w,
+			float h,
 			float scale,
 			float alpha,
 			@Nullable ScreenRectangle scissorArea) {
@@ -52,16 +57,54 @@ public record VoxelRoomRenderState(
 				blockEntities,
 				size,
 				snapshotId,
+				version,
 				yaw,
 				pitch,
-				x0,
-				y0,
-				x1,
-				y1,
+				x,
+				y,
+				w,
+				h,
 				scale,
 				alpha,
 				scissorArea,
-				PictureInPictureRenderState.getBounds(x0, y0, x1, y1, scissorArea));
+				PictureInPictureRenderState.getBounds(x0(x), y0(y), x0(x) + extent(w), y0(y) + extent(h), scissorArea));
+	}
+
+	@Override
+	public int x0() {
+		return x0(x);
+	}
+
+	@Override
+	public int y0() {
+		return y0(y);
+	}
+
+	@Override
+	public int x1() {
+		return x0(x) + extent(w);
+	}
+
+	@Override
+	public int y1() {
+		return y0(y) + extent(h);
+	}
+
+	@Override
+	public Matrix3x2f pose() {
+		return new Matrix3x2f().translate(x - x0(x), y - y0(y));
+	}
+
+	private static int x0(float value) {
+		return Mth.floor(value);
+	}
+
+	private static int y0(float value) {
+		return Mth.floor(value);
+	}
+
+	private static int extent(float value) {
+		return Math.max(1, Math.round(value));
 	}
 
 	public static @Nullable VoxelRoomRenderState of(
@@ -69,10 +112,10 @@ public record VoxelRoomRenderState(
 			int snapshotId,
 			float yaw,
 			float pitch,
-			int x0,
-			int y0,
-			int x1,
-			int y1,
+			float x0,
+			float y0,
+			float x1,
+			float y1,
 			@Nullable ScreenRectangle scissorArea) {
 		return of(snapshot, snapshotId, yaw, pitch, x0, y0, x1, y1, 1.0F, 1.0F, scissorArea);
 	}
@@ -82,10 +125,10 @@ public record VoxelRoomRenderState(
 			int snapshotId,
 			float yaw,
 			float pitch,
-			int x0,
-			int y0,
-			int x1,
-			int y1,
+			float x0,
+			float y0,
+			float x1,
+			float y1,
 			float zoom,
 			float alpha,
 			@Nullable ScreenRectangle scissorArea) {
@@ -103,12 +146,13 @@ public record VoxelRoomRenderState(
 				blockEntities,
 				snapshot.size(),
 				snapshotId,
+				PreviewCache.version(),
 				yaw,
 				pitch,
 				x0,
 				y0,
-				x1,
-				y1,
+				x1 - x0,
+				y1 - y0,
 				scale,
 				alpha,
 				scissorArea);
@@ -129,7 +173,7 @@ public record VoxelRoomRenderState(
 
 	public void submitDebugOutline(GuiGraphicsExtractor graphics) {
 		if (SpaceFoldClientConfig.debugPip && Minecraft.getInstance().hasControlDown()) {
-			graphics.outline(x0, y0, x1 - x0, y1 - y0, 0xFFFF00FF);
+			graphics.outline(x0(), y0(), x1() - x0(), y1() - y0(), 0xFFFF00FF);
 		}
 	}
 }

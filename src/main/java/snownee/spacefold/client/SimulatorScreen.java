@@ -227,7 +227,7 @@ public class SimulatorScreen extends Screen implements MenuAccess<SimulatorMenu>
 			simulateButton.setTooltip(null);
 			return;
 		}
-		SimulationTooltip tooltip = lastResult.failed() ? null : SimulationTooltip.of(lastResult);
+		SimulationTooltip tooltip = lastResult.failed() ? null : SimulationTooltip.of(lastResult, true, false);
 		if (tooltip == null && !lastResult.failed()) {
 			simulateButton.setTooltip(null);
 			return;

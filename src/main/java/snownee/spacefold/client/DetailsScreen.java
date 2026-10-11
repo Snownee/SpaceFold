@@ -4,14 +4,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 
+import org.joml.Matrix3x2f;
+import org.joml.Vector2i;
 import org.jspecify.annotations.Nullable;
 
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.InputConstants;
 
 import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.TabButton;
@@ -21,53 +27,49 @@ import net.minecraft.client.gui.components.tabs.Tab;
 import net.minecraft.client.gui.components.tabs.TabManager;
 import net.minecraft.client.gui.components.tabs.TabNavigationBar;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.gui.screens.inventory.tooltip.ClientTooltipPositioner;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.client.renderer.texture.AbstractTexture;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.client.resources.metadata.gui.GuiMetadataSection;
+import net.minecraft.client.resources.metadata.gui.GuiSpriteScaling;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
-import net.minecraft.world.item.Item;
+import net.minecraft.world.inventory.tooltip.TooltipComponent;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import snownee.kiwi.loader.Platform;
+import snownee.jade.overlay.FloatBlitRenderState;
 import snownee.kiwi.network.KPacketSender;
+import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
 import snownee.spacefold.SpaceFoldClientConfig;
 import snownee.spacefold.client.room.RadialGraphLayout;
 import snownee.spacefold.client.room.RoomSkyRenderState;
 import snownee.spacefold.client.room.VoxelRoomRenderState;
-import snownee.spacefold.compat.jade.JadeCompat;
 import snownee.spacefold.dim.RoomSnapshot;
 import snownee.spacefold.dim.SimulationResult;
 import snownee.spacefold.network.CRepeaterConfigPacket;
 import snownee.spacefold.network.SViewDetailsPacket.Entry;
+import snownee.spacefold.util.SpaceFoldUtil;
 
 public class DetailsScreen extends Screen {
-	private static final int COLUMNS = 2;
-	private static final int CELL_WIDTH = 150;
-	private static final int CELL_HEIGHT = 28;
-	private static final int PADDING = 8;
-	private static final int ICON_SIZE = 16;
-	private static final int BAR_HEIGHT = 4;
 	private static final int TEXT_COLOR = 0xFFFFFFFF;
 	private static final int MUTED_COLOR = 0xFFA0A0A0;
-	private static final int BAR_COLOR = 0xFF3FB950;
-	private static final int BAR_BACKGROUND = 0xFF303030;
-	private static final int PANEL_COLOR = 0xC0000000;
 	private static final long ANIMATION_MS = 350L;
 	private static final long FOV_ANIMATION_MS = 3000L;
 	/**
 	 * UI 元素相对天空延后出现的比例（0~1）：天空先淡入，面板/文字/图标随后再进（退场反之，先退）。
 	 */
 	private static final float UI_DELAY = 0.35F;
-	private static final int SLIDE_PIXELS = 10;
 	private static final float PREVIEW_PITCH = 25.0F;
-	private static final float MIN_ZOOM = 0.25F;
+	private static final float MIN_ZOOM = 0.2F;
 	private static final float MAX_ZOOM = 4.0F;
 	private static final float INITIAL_ZOOM = 3.0F;
 	private static final double ZOOM_SPEED = 0.15;
@@ -90,6 +92,9 @@ public class DetailsScreen extends Screen {
 	private static final int NODE_BACKGROUND_MARGIN = 12;
 	private static final float FOCUS_YAW_SPEED = 1.5F;
 	private static final float PAN_BACKGROUND_ROTATION = 0.0005F;
+	private static final ClientTooltipPositioner CENTERED_TOOLTIP_POSITIONER =
+			(screenWidth, screenHeight, mouseX, mouseY, tooltipWidth, tooltipHeight) ->
+					new Vector2i(mouseX - tooltipWidth / 2, mouseY);
 	private static final WidgetSprites TAB_SPRITES = new WidgetSprites(
 			Identifier.withDefaultNamespace("widget/tab_selected"),
 			Identifier.withDefaultNamespace("widget/tab"),
@@ -115,6 +120,8 @@ public class DetailsScreen extends Screen {
 	private float closeStartFov = 1.0F;
 	private float zoom = INITIAL_ZOOM;
 	private float targetZoom = INITIAL_ZOOM;
+	private double zoomVelocity;
+	private boolean focusZoomActive;
 	private long zoomUpdatedAt = Util.getMillis();
 	private double camX;
 	private double camY;
@@ -137,33 +144,38 @@ public class DetailsScreen extends Screen {
 	private RadialGraphLayout.@Nullable Node focusedNode;
 	private float focusAmount;
 	private long focusUpdatedAt = Util.getMillis();
-	private int left;
-	private int top;
-	private int rows;
 	private final int configSlot;
-	private final ItemStack configIcon;
+	private final ItemStack viewedStack;
 	private int graphSnapshotId = Integer.MIN_VALUE;
+	private int graphVersion = Integer.MIN_VALUE;
 	private RadialGraphLayout.@Nullable Node hoveredNode;
+	private MaterialList materialList;
+	private boolean materialsVisible;
 
-	public DetailsScreen(List<Entry> entries, boolean showProgress, int snapshotId) {
-		this(entries, showProgress, snapshotId, -1, ItemStack.EMPTY);
-	}
-
-	public DetailsScreen(List<Entry> entries, boolean showProgress, int snapshotId, int configSlot, ItemStack configIcon) {
+	public DetailsScreen(List<Entry> entries, boolean showProgress, int snapshotId, int configSlot, ItemStack viewedStack) {
 		super(Component.translatable("gui.spacefold.details"));
 		this.entries = entries;
 		this.showProgress = showProgress;
 		this.snapshotId = snapshotId;
 		this.configSlot = configSlot;
-		this.configIcon = configIcon;
+		this.viewedStack = viewedStack;
 	}
 
 	@Override
 	protected void init() {
+		materialList = new MaterialList(minecraft, entries, showProgress);
 		tabNavigationBar = TabNavigationBar.builder(tabManager, width).addTabs(spaceTab, materialsTab).build();
 		addWidget(tabNavigationBar);
+		addWidget(materialList);
 		tabNavigationBar.updateWidth(width);
-		tabNavigationBar.selectTab(lastTabIndex, false);
+		if (snapshotId == SimulationResult.NO_SNAPSHOT) {
+			tabNavigationBar.setTabActiveState(tabs.indexOf(spaceTab), false);
+			tabNavigationBar.selectTab(tabs.indexOf(materialsTab), false);
+		} else {
+			tabNavigationBar.selectTab(lastTabIndex, false);
+		}
+		materialsVisible = isMaterialsTab();
+		materialList.visible = materialsVisible;
 		layoutContent();
 	}
 
@@ -176,10 +188,9 @@ public class DetailsScreen extends Screen {
 	}
 
 	private void layoutContent() {
-		rows = Math.max(1, (entries.size() + COLUMNS - 1) / COLUMNS);
-		int contentTop = contentTop();
-		left = (width - COLUMNS * CELL_WIDTH) / 2;
-		top = contentTop + Math.max(PADDING + 12, (height - contentTop - rows * CELL_HEIGHT) / 2);
+		if (materialList != null) {
+			materialList.updateLayout(width / 2, contentTop(), height);
+		}
 	}
 
 	private int contentTop() {
@@ -213,13 +224,24 @@ public class DetailsScreen extends Screen {
 		super.extractRenderState(graphics, mouseX, mouseY, partialTick);
 		updateZoom();
 		hoveredNode = null;
-		if (isSpaceTab()) {
+		boolean materials = isMaterialsTab();
+		if (materialList != null) {
+			if (materialsVisible != materials) {
+				materialsVisible = materials;
+				if (!materials && getFocused() == materialList) {
+					clearFocus();
+				}
+			}
+			materialList.visible = materials;
+			materialList.setAlpha(uiProgress());
+		}
+		if (materials) {
+			renderMaterials(graphics, mouseX, mouseY, partialTick);
+		} else {
 			updateFocus();
 			updateCamera();
 			updateBackgroundRotation();
 			renderSpace(graphics, mouseX, mouseY);
-		} else {
-			renderMaterials(graphics, mouseX, mouseY);
 		}
 		renderTabBar(graphics, mouseX, mouseY);
 		renderConfigButton(graphics, mouseX, mouseY);
@@ -227,7 +249,7 @@ public class DetailsScreen extends Screen {
 	}
 
 	private void renderDebugOverlay(GuiGraphicsExtractor graphics) {
-		if (!SpaceFoldClientConfig.debugGraph) {
+		if (!SpaceFoldClientConfig.debugGraph || !isSpaceTab()) {
 			return;
 		}
 		float p = uiProgress();
@@ -273,6 +295,7 @@ public class DetailsScreen extends Screen {
 			boolean selected = button.isSelected();
 			boolean highlighted = button.isFocused() ||
 					(mouseX >= button.getX() && mouseX < button.getRight() && mouseY >= button.getY() && mouseY < button.getBottom());
+			int buttonColor = button.isActive() ? color : withAlpha(MUTED_COLOR, p);
 			graphics.blitSprite(
 					RenderPipelines.GUI_TEXTURED,
 					TAB_SPRITES.get(selected, highlighted),
@@ -280,15 +303,18 @@ public class DetailsScreen extends Screen {
 					button.getY(),
 					button.getWidth(),
 					button.getHeight(),
-					color);
+					buttonColor);
 			Component label = button.getMessage();
 			int labelY = button.getY() + (selected ? 8 : 9);
-			graphics.centeredText(font, label, button.getX() + button.getWidth() / 2, labelY, color);
+			graphics.centeredText(font, label, button.getX() + button.getWidth() / 2, labelY, buttonColor);
 			if (selected) {
 				int textWidth = Math.min(font.width(label), button.getWidth() - 4);
 				int textLeft = button.getX() + (button.getWidth() - textWidth) / 2;
 				int underlineY = button.getY() + button.getHeight() - 2;
-				graphics.fill(textLeft, underlineY, textLeft + textWidth, underlineY + 1, color);
+				graphics.fill(textLeft, underlineY, textLeft + textWidth, underlineY + 1, buttonColor);
+			}
+			if (!button.isActive() && highlighted) {
+				graphics.setTooltipForNextFrame(font, Component.translatable("gui.spacefold.details.no_snapshot"), mouseX, mouseY);
 			}
 		}
 	}
@@ -320,8 +346,8 @@ public class DetailsScreen extends Screen {
 		int y = configY();
 		boolean hover = isOverConfig(mouseX, mouseY);
 		graphics.fill(x, y, x + CONFIG_SIZE, y + CONFIG_SIZE, withAlpha(hover ? CONFIG_HOVER_COLOR : CONFIG_COLOR, p));
-		if (!configIcon.isEmpty()) {
-			graphics.item(configIcon, x + 2, y + 2);
+		if (!viewedStack.isEmpty()) {
+			graphics.item(viewedStack, x + 2, y + 2);
 		}
 		if (hover) {
 			graphics.setTooltipForNextFrame(font, Component.translatable("gui.spacefold.repeater_config"), mouseX, mouseY);
@@ -335,6 +361,20 @@ public class DetailsScreen extends Screen {
 		if (elapsed <= 0) {
 			return;
 		}
+		if (focusZoomActive && isFocusMode() && focusedNode != null) {
+			double dt = Mth.clamp(elapsed / 1000.0, 0.0, 0.05);
+			double c = 2.0 * Math.sqrt(CAM_SPRING);
+			zoomVelocity += (CAM_SPRING * (targetZoom - zoom) - c * zoomVelocity) * dt;
+			zoom += (float) (zoomVelocity * dt);
+			if (Math.abs(targetZoom - zoom) < 0.001F && Math.abs(zoomVelocity) < 0.02) {
+				zoom = targetZoom;
+				zoomVelocity = 0.0;
+				focusZoomActive = false;
+			}
+			return;
+		}
+		focusZoomActive = false;
+		zoomVelocity = 0.0;
 		if (Math.abs(targetZoom - zoom) < 0.001F) {
 			zoom = targetZoom;
 			return;
@@ -492,6 +532,16 @@ public class DetailsScreen extends Screen {
 		camTargetY += (target.y() - camTargetY) * ZOOM_NUDGE;
 	}
 
+	private void centerOnRoot() {
+		RadialGraphLayout.Node root = graphLayout.root();
+		if (root == null) {
+			return;
+		}
+		hasCamTarget = true;
+		camTargetX = root.x();
+		camTargetY = root.y();
+	}
+
 	private double halfMin() {
 		return Math.min(width, height - contentTop()) / 2.0;
 	}
@@ -520,49 +570,56 @@ public class DetailsScreen extends Screen {
 		ensureGraph(snapshot);
 		graphLayout.simulate();
 		float nodeSize = GRAPH_NODE_SIZE * zoom;
+		float half = nodeSize / 2.0F;
+		float cullRadius = half + NODE_BACKGROUND_MARGIN + 2.0F;
 		float linksAlpha = p * 0.85F * (1.0F - focusAmount);
 		if (linksAlpha > 0.001F) {
 			for (RadialGraphLayout.Node node : graphLayout.nodes()) {
 				RadialGraphLayout.Node parent = node.parent();
 				if (parent != null) {
-					drawLink(
-							graphics,
-							displayX(parent),
-							displayY(parent),
-							displayX(node),
-							displayY(node),
-							tierColor(node.tier()),
-							linksAlpha);
+					float x0 = displayX(parent);
+					float y0 = displayY(parent);
+					float x1 = displayX(node);
+					float y1 = displayY(node);
+					if (isSegmentVisible(x0, y0, x1, y1)) {
+						drawLink(graphics, x0, y0, x1, y1, tierColor(node.tier()), linksAlpha);
+					}
 				}
 			}
 		}
-		for (RadialGraphLayout.Node node : graphLayout.nodes()) {
-			if (node.snapshotId() >= 0 && node.tier() > 0) {
-				graphics.centeredText(
-						font,
-						Component.literal("T" + node.tier()),
-						Math.round(displayX(node)),
-						Math.round(displayY(node) - nodeSize / 2.0F - 11.0F),
-						withAlpha(TEXT_COLOR, p * (1.0F - focusAmount)));
-			}
-		}
+//		for (RadialGraphLayout.Node node : graphLayout.nodes()) {
+//			if (node.snapshotId() >= 0 && node.tier() > 0) {
+//				graphics.centeredText(
+//						font,
+//						Component.literal("T" + node.tier()),
+//						Math.round(displayX(node)),
+//						Math.round(displayY(node) - nodeSize / 2.0F - 11.0F),
+//						withAlpha(TEXT_COLOR, p * (1.0F - focusAmount)));
+//			}
+//		}
 		float backgroundAlpha = p * (1.0F - focusAmount);
 		if (backgroundAlpha > 0.001F) {
 			for (RadialGraphLayout.Node node : graphLayout.nodes()) {
-				renderNodeBackground(
-						graphics,
-						node.parent() == null ? ROOT_SPRITE : NODE_SPRITE,
-						displayX(node),
-						displayY(node),
-						nodeSize,
-						backgroundAlpha);
+				float x = displayX(node);
+				float y = displayY(node);
+				if (isCircleVisible(x, y, cullRadius)) {
+					renderNodeBackground(
+							graphics,
+							node.parent() == null ? ROOT_SPRITE : NODE_SPRITE,
+							x,
+							y,
+							nodeSize,
+							backgroundAlpha);
+				}
 			}
 		}
-		float half = nodeSize / 2.0F;
 		hoveredNode = null;
 		for (RadialGraphLayout.Node node : graphLayout.nodes()) {
 			float x = displayX(node);
 			float y = displayY(node);
+			if (!isCircleVisible(x, y, cullRadius)) {
+				continue;
+			}
 			float nodeAlpha = node == focusedNode ? p : p * (1.0F - focusAmount);
 			if (nodeAlpha > 0.001F) {
 				renderNode(graphics, node, x, y, nodeSize, nodeAlpha);
@@ -570,6 +627,36 @@ public class DetailsScreen extends Screen {
 			if (mouseX >= x - half && mouseX < x + half && mouseY >= y - half && mouseY < y + half) {
 				hoveredNode = node;
 			}
+		}
+		tooltip:
+		if (!isFocusMode() && hoveredNode != null && !closing) {
+			ItemStack icon = hoveredNode.icon();
+			if (icon.isEmpty()) {
+				break tooltip;
+			}
+			List<FormattedCharSequence> lines = List.of();
+			Optional<TooltipComponent> component = Optional.empty();
+			SimulationResult result = icon.get(CoreModule.SIMULATION_RESULT.get());
+			if (result == null || icon.getCustomName() != null) {
+				lines = List.of(icon.getHoverName().getVisualOrderText());
+			}
+			if (result != null) {
+				component = Optional.ofNullable(SimulationTooltip.of(result, true, false));
+			}
+			if (lines.isEmpty() && component.isEmpty()) {
+				break tooltip;
+			}
+			int cx = Math.round(displayX(hoveredNode));
+			int cy = Math.round(displayY(hoveredNode) + half + 6.0F);
+			graphics.setTooltipForNextFrame(
+					font,
+					lines,
+					component,
+					CENTERED_TOOLTIP_POSITIONER,
+					cx,
+					cy,
+					false,
+					null);
 		}
 		if (SpaceFoldClientConfig.debugGraph && hoveredNode != null) {
 			int outlineHalf = Math.round(half);
@@ -599,15 +686,245 @@ public class DetailsScreen extends Screen {
 			float cy,
 			float size,
 			float alpha) {
-		int contentWidth = Math.max(1, Math.round(size));
-		int contentHeight = Math.max(1, Math.round(size));
-		int x = Math.round(cx) - contentWidth / 2 - NODE_BACKGROUND_MARGIN;
-		int y = Math.round(cy) - contentHeight / 2 - NODE_BACKGROUND_MARGIN;
-		int width = contentWidth + NODE_BACKGROUND_MARGIN * 2;
-		int height = contentHeight + NODE_BACKGROUND_MARGIN * 2;
+		float half = size / 2.0F;
+		float x = cx - half - NODE_BACKGROUND_MARGIN;
+		float y = cy - half - NODE_BACKGROUND_MARGIN;
+		float width = size + NODE_BACKGROUND_MARGIN * 2.0F;
+		float height = size + NODE_BACKGROUND_MARGIN * 2.0F;
 		int color = withAlpha(0xFFFFFFFF, alpha);
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, getBackgroundSprite(sprite), x, y, width, height, color);
-		graphics.blitSprite(RenderPipelines.GUI_TEXTURED, getFrameSprite(sprite), x, y, width, height, color);
+		blitSprite(graphics, RenderPipelines.GUI_TEXTURED, getBackgroundSprite(sprite), x, y, width, height, color);
+		blitSprite(graphics, RenderPipelines.GUI_TEXTURED, getFrameSprite(sprite), x, y, width, height, color);
+	}
+
+	private static void blitSprite(
+			GuiGraphicsExtractor graphics,
+			RenderPipeline pipeline,
+			Identifier spriteId,
+			float x,
+			float y,
+			float width,
+			float height,
+			int color) {
+		if (width <= 0.0F || height <= 0.0F) {
+			return;
+		}
+		TextureAtlasSprite sprite = graphics.guiSprites.getSprite(spriteId);
+		GuiSpriteScaling scaling = sprite.contents()
+				.getAdditionalMetadata(GuiMetadataSection.TYPE)
+				.map(GuiMetadataSection::scaling)
+				.orElse(GuiSpriteScaling.DEFAULT);
+		if (scaling instanceof GuiSpriteScaling.NineSlice nineSlice) {
+			blitNineSlicedSprite(graphics, pipeline, sprite, nineSlice, x, y, width, height, color);
+		} else {
+			blitSprite(
+					graphics,
+					pipeline,
+					sprite,
+					x,
+					y,
+					x + width,
+					y + height,
+					sprite.getU0(),
+					sprite.getV0(),
+					sprite.getU1(),
+					sprite.getV1(),
+					color);
+		}
+	}
+
+	private static void blitNineSlicedSprite(
+			GuiGraphicsExtractor graphics,
+			RenderPipeline pipeline,
+			TextureAtlasSprite sprite,
+			GuiSpriteScaling.NineSlice nineSlice,
+			float x,
+			float y,
+			float width,
+			float height,
+			int color) {
+		GuiSpriteScaling.NineSlice.Border border = nineSlice.border();
+		float texWidth = nineSlice.width();
+		float texHeight = nineSlice.height();
+		float left = Math.min(border.left(), width / 2.0F);
+		float right = Math.min(border.right(), width / 2.0F);
+		float top = Math.min(border.top(), height / 2.0F);
+		float bottom = Math.min(border.bottom(), height / 2.0F);
+		if (width == texWidth && height == texHeight) {
+			blitSprite(
+					graphics,
+					pipeline,
+					sprite,
+					x,
+					y,
+					x + width,
+					y + height,
+					sprite.getU0(),
+					sprite.getV0(),
+					sprite.getU1(),
+					sprite.getV1(),
+					color);
+			return;
+		}
+		float uLeft = left / texWidth;
+		float uRight = (texWidth - right) / texWidth;
+		float vTop = top / texHeight;
+		float vBottom = (texHeight - bottom) / texHeight;
+		float middleX = x + left;
+		float middleY = y + top;
+		float rightX = x + width - right;
+		float bottomY = y + height - bottom;
+		float edgeRight = x + width;
+		float edgeBottom = y + height;
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				x,
+				y,
+				middleX,
+				middleY,
+				sprite.getU(0.0F),
+				sprite.getV(0.0F),
+				sprite.getU(uLeft),
+				sprite.getV(vTop),
+				color);
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				rightX,
+				y,
+				edgeRight,
+				middleY,
+				sprite.getU(uRight),
+				sprite.getV(0.0F),
+				sprite.getU(1.0F),
+				sprite.getV(vTop),
+				color);
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				x,
+				bottomY,
+				middleX,
+				edgeBottom,
+				sprite.getU(0.0F),
+				sprite.getV(vBottom),
+				sprite.getU(uLeft),
+				sprite.getV(1.0F),
+				color);
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				rightX,
+				bottomY,
+				edgeRight,
+				edgeBottom,
+				sprite.getU(uRight),
+				sprite.getV(vBottom),
+				sprite.getU(1.0F),
+				sprite.getV(1.0F),
+				color);
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				middleX,
+				y,
+				rightX,
+				middleY,
+				sprite.getU(uLeft),
+				sprite.getV(0.0F),
+				sprite.getU(uRight),
+				sprite.getV(vTop),
+				color);
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				middleX,
+				bottomY,
+				rightX,
+				edgeBottom,
+				sprite.getU(uLeft),
+				sprite.getV(vBottom),
+				sprite.getU(uRight),
+				sprite.getV(1.0F),
+				color);
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				x,
+				middleY,
+				middleX,
+				bottomY,
+				sprite.getU(0.0F),
+				sprite.getV(vTop),
+				sprite.getU(uLeft),
+				sprite.getV(vBottom),
+				color);
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				rightX,
+				middleY,
+				edgeRight,
+				bottomY,
+				sprite.getU(uRight),
+				sprite.getV(vTop),
+				sprite.getU(1.0F),
+				sprite.getV(vBottom),
+				color);
+		blitSprite(
+				graphics,
+				pipeline,
+				sprite,
+				middleX,
+				middleY,
+				rightX,
+				bottomY,
+				sprite.getU(uLeft),
+				sprite.getV(vTop),
+				sprite.getU(uRight),
+				sprite.getV(vBottom),
+				color);
+	}
+
+	private static void blitSprite(
+			GuiGraphicsExtractor graphics,
+			RenderPipeline pipeline,
+			TextureAtlasSprite sprite,
+			float x0,
+			float y0,
+			float x1,
+			float y1,
+			float u0,
+			float v0,
+			float u1,
+			float v1,
+			int color) {
+		if (x0 == x1 || y0 == y1) {
+			return;
+		}
+		AbstractTexture texture = Minecraft.getInstance().getTextureManager().getTexture(sprite.atlasLocation());
+		graphics.guiRenderState.addGuiElement(new FloatBlitRenderState(
+				pipeline,
+				TextureSetup.singleTexture(texture.getTextureView(), texture.getSampler()),
+				new Matrix3x2f(graphics.pose()),
+				x0,
+				y0,
+				x1,
+				y1,
+				u0,
+				u1,
+				v0,
+				v1,
+				color,
+				graphics.scissorStack.peek()));
 	}
 
 	private static Identifier getBackgroundSprite(Identifier style) {
@@ -627,12 +944,24 @@ public class DetailsScreen extends Screen {
 	}
 
 	private void ensureGraph(RoomSnapshot snapshot) {
-		if (snapshotId == graphSnapshotId) {
+		int version = PreviewCache.version();
+		boolean rootChanged = snapshotId != graphSnapshotId;
+		if (!rootChanged && version == graphVersion) {
 			return;
 		}
 		graphSnapshotId = snapshotId;
-		List<SimulationResult> leaves = snapshot.topRepeaterResults(Objects.requireNonNull(minecraft.level).registryAccess());
-		graphLayout.reset(snapshotId, leaves);
+		graphVersion = version;
+		IntFunction<List<ItemStack>> childrenLookup = id -> {
+			RoomSnapshot child = id == snapshotId ? snapshot : PreviewCache.getSnapshot(id);
+			return child == null ? null : child.topRepeaterResults(Objects.requireNonNull(minecraft.level).registryAccess());
+		};
+		if (!rootChanged) {
+			graphLayout.expandPending(childrenLookup);
+			return;
+		}
+		SimulationResult rootResult = viewedStack.get(CoreModule.SIMULATION_RESULT.get());
+		int rootTier = rootResult == null ? 0 : rootResult.tier();
+		graphLayout.reset(snapshotId, rootTier, viewedStack, childrenLookup);
 		camX = 0.0;
 		camY = 0.0;
 		camTargetX = 0.0;
@@ -648,14 +977,14 @@ public class DetailsScreen extends Screen {
 		backgroundRotation = 0.0F;
 		lastCamX = 0.0;
 		sessionYaws.clear();
-		focusedNode = null;
-		focusAmount = 0.0F;
+		focusAmount = isFocusMode() ? 1.0F : 0.0F;
+		focusedNode = isFocusMode() ? graphLayout.root() : null;
 	}
 
 	private void renderNode(GuiGraphicsExtractor graphics, RadialGraphLayout.Node node, float x, float y, float size, float alpha) {
 		int id = node.snapshotId();
 		RoomSnapshot snapshot = id >= 0 ? PreviewCache.getSnapshot(id) : null;
-		if (snapshot != null) {
+		if (snapshot != null && !minecraft.hasShiftDown() /*&& zoom > 0.3F*/) {
 			renderRoomNode(graphics, snapshot, id, x, y, size, alpha);
 		} else if (!node.icon().isEmpty()) {
 			renderItemNode(graphics, node.icon(), x, y, size, alpha);
@@ -677,18 +1006,16 @@ public class DetailsScreen extends Screen {
 	}
 
 	private void renderRoomNode(GuiGraphicsExtractor graphics, RoomSnapshot snapshot, int id, float cx, float cy, float size, float alpha) {
-		int half = Math.max(1, Math.round(size / 2.0F));
-		int x0 = Math.round(cx) - half;
-		int y0 = Math.round(cy) - half;
+		float half = size / 2.0F;
 		VoxelRoomRenderState state = VoxelRoomRenderState.of(
 				snapshot,
 				id,
 				sessionYaws.containsKey(id) ? sessionYaws.get(id) : PreviewCache.getYaw(id),
 				PREVIEW_PITCH,
-				x0,
-				y0,
-				x0 + half * 2,
-				y0 + half * 2,
+				cx - half,
+				cy - half,
+				cx + half,
+				cy + half,
 				1.0F,
 				alpha,
 				graphics.scissorStack.peek());
@@ -699,6 +1026,18 @@ public class DetailsScreen extends Screen {
 
 	private float graphCenterX() {
 		return width / 2.0F;
+	}
+
+	private boolean isCircleVisible(float x, float y, float radius) {
+		return x + radius >= 0.0F && x - radius <= width && y + radius >= 0.0F && y - radius <= height;
+	}
+
+	private boolean isSegmentVisible(float x0, float y0, float x1, float y1) {
+		float minX = Math.min(x0, x1);
+		float maxX = Math.max(x0, x1);
+		float minY = Math.min(y0, y1);
+		float maxY = Math.max(y0, y1);
+		return maxX >= 0.0F && minX <= width && maxY >= 0.0F && minY <= height;
 	}
 
 	private float graphCenterY() {
@@ -752,59 +1091,9 @@ public class DetailsScreen extends Screen {
 		}
 	}
 
-	private void renderMaterials(GuiGraphicsExtractor graphics, int mouseX, int mouseY) {
-		float p = uiProgress();
-		int dy = contentOffsetY();
-		graphics.fill(
-				left - PADDING,
-				top - PADDING + dy,
-				left + COLUMNS * CELL_WIDTH + PADDING,
-				top + rows * CELL_HEIGHT + PADDING + dy,
-				withAlpha(PANEL_COLOR, p));
-		for (int i = 0; i < entries.size(); i++) {
-			Entry entry = entries.get(i);
-			int x = left + i % COLUMNS * CELL_WIDTH;
-			int y = top + i / COLUMNS * CELL_HEIGHT + dy;
-			renderEntry(graphics, entry, x, y, mouseX, mouseY, p);
-		}
-	}
-
-	private void renderEntry(GuiGraphicsExtractor graphics, Entry entry, int x, int y, int mouseX, int mouseY, float p) {
-		ItemStack stack = entry.item().toStack();
-		// 物品图标无法逐帧调透明度，改用它自身的 pose 做缩放淡入（与面板 alpha 同步，不依赖绘制顺序）。
-		graphics.pose().pushMatrix();
-		graphics.pose().translate(x + ICON_SIZE / 2.0F, y + ICON_SIZE / 2.0F);
-		graphics.pose().scale(p, p);
-		graphics.pose().translate(-(x + ICON_SIZE / 2.0F), -(y + ICON_SIZE / 2.0F));
-		graphics.item(stack, x, y);
-		graphics.pose().popMatrix();
-		graphics.text(font, stack.getHoverName(), x + ICON_SIZE + 4, y, withAlpha(TEXT_COLOR, p), false);
-		if (!showProgress) {
-			graphics.text(
-					font,
-					Component.translatable("gui.spacefold.material_quantity", entry.total()),
-					x + ICON_SIZE + 4,
-					y + 9,
-					withAlpha(MUTED_COLOR, p),
-					false);
-			if (mouseX >= x && mouseX < x + ICON_SIZE && mouseY >= y && mouseY < y + ICON_SIZE) {
-				graphics.setTooltipForNextFrame(font, stack, mouseX, mouseY);
-			}
-			return;
-		}
-		int percent = entry.total() <= 0 ? 100 : (int) Math.round(100.0 * entry.provided() / entry.total());
-		Component progress = Component.translatable("gui.spacefold.material_progress", entry.provided(), entry.total(), percent);
-		graphics.text(font, progress, x + ICON_SIZE + 4, y + 9, withAlpha(MUTED_COLOR, p), false);
-		int barX = x + ICON_SIZE + 4;
-		int barY = y + 18;
-		int barWidth = CELL_WIDTH - ICON_SIZE - 12;
-		graphics.fill(barX, barY, barX + barWidth, barY + BAR_HEIGHT, withAlpha(BAR_BACKGROUND, p));
-		int filled = entry.total() <= 0 ? barWidth : (int) Math.round(barWidth * (double) entry.provided() / entry.total());
-		if (filled > 0) {
-			graphics.fill(barX, barY, barX + filled, barY + BAR_HEIGHT, withAlpha(BAR_COLOR, p));
-		}
-		if (mouseX >= x && mouseX < x + ICON_SIZE && mouseY >= y && mouseY < y + ICON_SIZE) {
-			graphics.setTooltipForNextFrame(font, stack, mouseX, mouseY);
+	private void renderMaterials(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float partialTick) {
+		if (materialList != null) {
+			materialList.extractRenderState(graphics, mouseX, mouseY, partialTick);
 		}
 	}
 
@@ -814,33 +1103,23 @@ public class DetailsScreen extends Screen {
 			KPacketSender.sendToServer(new CRepeaterConfigPacket(configSlot));
 			return true;
 		}
-		if (isMaterialsTab() && (event.button() == 0 || event.button() == 1)) {
-			int dy = contentOffsetY();
-			for (int i = 0; i < entries.size(); i++) {
-				int x = left + i % COLUMNS * CELL_WIDTH;
-				int y = top + i / COLUMNS * CELL_HEIGHT + dy;
-				if (event.x() >= x && event.x() < x + ICON_SIZE && event.y() >= y && event.y() < y + ICON_SIZE) {
-					if (Platform.isModLoaded("jade")) {
-						JadeCompat.lookupRecipes(entries.get(i).item().toStack(), event.button() == 1);
-					}
-					return true;
-				}
-			}
-		}
 		if (isSpaceTab() && event.button() == 0 && event.y() >= contentTop()) {
 			if (isFocusMode()) {
 				if (focusedNode != null && focusedNode.snapshotId() >= 0) {
 					yawDraggingId = focusedNode.snapshotId();
 					return true;
 				}
-			} else if (minecraft.hasControlDown()) {
-				RadialGraphLayout.Node node = nodeAt(event.x(), event.y());
-				if (node != null) {
+			} else {
+				RadialGraphLayout.Node node = nodeAt(event.x(), event.y(), doubleClick);
+				if (doubleClick && node != null) {
+					enterFocus(node);
+					return true;
+				}
+				if (minecraft.hasControlDown() && node != null) {
 					nodeDragging = node;
 					graphLayout.setNodeFixed(node, true);
 					return true;
 				}
-			} else {
 				dragging = true;
 				dragAccumX = 0.0;
 				dragAccumY = 0.0;
@@ -898,12 +1177,12 @@ public class DetailsScreen extends Screen {
 		}
 	}
 
-	private RadialGraphLayout.@Nullable Node nodeAt(double screenX, double screenY) {
+	private RadialGraphLayout.@Nullable Node nodeAt(double screenX, double screenY, boolean includeRoot) {
 		float half = GRAPH_NODE_SIZE * zoom / 2.0F;
 		RadialGraphLayout.Node best = null;
 		double bestDist = Double.MAX_VALUE;
 		for (RadialGraphLayout.Node node : graphLayout.nodes()) {
-			if (node.parent() == null) {
+			if (!includeRoot && node.parent() == null) {
 				continue;
 			}
 			double dx = displayX(node) - screenX;
@@ -919,9 +1198,25 @@ public class DetailsScreen extends Screen {
 		return best;
 	}
 
+	private void enterFocus(RadialGraphLayout.Node node) {
+		focusedNode = node;
+		targetZoom = Math.max(targetZoom, FOCUS_ZOOM);
+		camVx = 0.0;
+		camVy = 0.0;
+		zoomVelocity = 0.0;
+		focusZoomActive = true;
+		hasCamTarget = false;
+		dragging = false;
+		dragAccumX = 0.0;
+		dragAccumY = 0.0;
+		nodeDragging = null;
+		yawDraggingId = -1;
+	}
+
 	@Override
 	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
 		if (isSpaceTab() && scrollY != 0.0) {
+			focusZoomActive = false;
 			float newTarget = Mth.clamp(targetZoom * (float) Math.exp(scrollY * ZOOM_SPEED), MIN_ZOOM, MAX_ZOOM);
 			if (scrollY > 0.0 && targetZoom < FOCUS_ZOOM && newTarget >= FOCUS_ZOOM && !canCaptureFocus()) {
 				nudgeCameraTowards(mouseX, mouseY);
@@ -938,9 +1233,13 @@ public class DetailsScreen extends Screen {
 
 	@Override
 	public boolean keyPressed(KeyEvent event) {
+		if (isSpaceTab() && event.key() == InputConstants.KEY_SPACE) {
+			centerOnRoot();
+			return true;
+		}
 		if (SpaceFoldClientConfig.debugGraph && hoveredNode != null) {
 			if (event.key() == InputConstants.KEY_N) {
-				graphLayout.addChild(hoveredNode, randomItem());
+				graphLayout.addChild(hoveredNode, SpaceFoldUtil.randomItem());
 				return true;
 			}
 			if (event.key() == InputConstants.KEY_D) {
@@ -953,11 +1252,6 @@ public class DetailsScreen extends Screen {
 			return true;
 		}
 		return super.keyPressed(event);
-	}
-
-	private static ItemStack randomItem() {
-		List<Item> items = BuiltInRegistries.ITEM.stream().filter(item -> item != Items.AIR).toList();
-		return new ItemStack(items.get((int) (Math.random() * items.size())));
 	}
 
 	@Override
@@ -1004,10 +1298,6 @@ public class DetailsScreen extends Screen {
 		}
 		float t = Mth.clamp((Util.getMillis() - openedAt) / (float) FOV_ANIMATION_MS, 0.0F, 1.0F);
 		return easeOutQuint(t);
-	}
-
-	private int contentOffsetY() {
-		return Math.round((1.0F - uiProgress()) * SLIDE_PIXELS);
 	}
 
 	private static float easeOutCubic(float t) {

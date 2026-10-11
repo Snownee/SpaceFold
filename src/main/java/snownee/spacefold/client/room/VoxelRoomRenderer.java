@@ -21,6 +21,7 @@ import net.fabricmc.fabric.api.client.renderer.v1.render.AltModelBlockRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.gui.render.pip.PictureInPictureRenderer;
+import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.Sheets;
@@ -45,6 +46,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.CardinalLighting;
 import net.minecraft.world.level.ColorResolver;
+import net.minecraft.world.level.DryFoliageColor;
+import net.minecraft.world.level.FoliageColor;
+import net.minecraft.world.level.GrassColor;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.block.Blocks;
@@ -64,6 +68,7 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 
 	private static final Map<Integer, BlockEntity> BE_CACHE = new HashMap<>();
 	private static int beCacheSnapshotId = Integer.MIN_VALUE;
+	private static int beCacheContentVersion = Integer.MIN_VALUE;
 	private static @Nullable Level beCacheLevel;
 
 	private @Nullable AltModelBlockRenderer blockRenderer;
@@ -191,7 +196,7 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 			VoxelRoomRenderState state,
 			Level level,
 			BlockEntityRenderDispatcher dispatcher) {
-		if (state.snapshotId() == beCacheSnapshotId && level == beCacheLevel) {
+		if (state.snapshotId() == beCacheSnapshotId && state.version() == beCacheContentVersion && level == beCacheLevel) {
 			return BE_CACHE;
 		}
 		BE_CACHE.clear();
@@ -216,6 +221,7 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 			BE_CACHE.put(index, blockEntity);
 		}
 		beCacheSnapshotId = state.snapshotId();
+		beCacheContentVersion = state.version();
 		beCacheLevel = level;
 		return BE_CACHE;
 	}
@@ -257,10 +263,10 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 	}
 
 	private static ContentKey contentKey(VoxelRoomRenderState state) {
-		return new ContentKey(state.snapshotId(), state.size(), state.yaw(), state.pitch(), state.scale());
+		return new ContentKey(state.snapshotId(), state.version(), state.size(), state.yaw(), state.pitch(), state.scale());
 	}
 
-	private record ContentKey(int snapshotId, int size, float yaw, float pitch, float scale) {
+	private record ContentKey(int snapshotId, int contentVersion, int size, float yaw, float pitch, float scale) {
 	}
 
 	private static final class CapturingRenderState extends BlockModelRenderState {
@@ -305,6 +311,15 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 
 		@Override
 		public int getBlockTint(BlockPos pos, ColorResolver color) {
+			if (color == BiomeColors.GRASS_COLOR_RESOLVER) {
+				return GrassColor.getDefaultColor();
+			}
+			if (color == BiomeColors.FOLIAGE_COLOR_RESOLVER) {
+				return FoliageColor.FOLIAGE_DEFAULT;
+			}
+			if (color == BiomeColors.DRY_FOLIAGE_COLOR_RESOLVER) {
+				return DryFoliageColor.FOLIAGE_DRY_DEFAULT;
+			}
 			return -1;
 		}
 

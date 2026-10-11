@@ -24,12 +24,12 @@
 	],
 	"accessWidener": "spacefold.classtweaker",
 	"depends": {
-		"kiwi": ">=26",
-		"athena": "*",
-		"xercapaint": "*"
+		"kiwi": ">=26.0.20",
+		"jade": ">=26.1.11"
 	},
 	"suggests": {
-		"jade": "*"
+		"athena": "*",
+		"xercapaint": "*"
 	},
 	"contact": {
 		"homepage": "https://www.curseforge.com/minecraft/mc-mods/space-fold",

@@ -19,6 +19,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.RegistryOps;
 import net.minecraft.util.ProblemReporter;
 import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -27,6 +28,7 @@ import net.minecraft.world.level.saveddata.SavedDataType;
 import net.minecraft.world.level.storage.TagValueOutput;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
+import snownee.spacefold.block.RepeaterBlock;
 
 public class RoomSnapshot extends SavedData {
 	public static final int PREVIEW_ID_BASE = 1 << 24;
@@ -54,6 +56,10 @@ public class RoomSnapshot extends SavedData {
 		this.size = size;
 		this.palette = palette;
 		this.blocks = blocks;
+	}
+
+	public static RoomSnapshot create(int room, int size, List<BlockState> palette, List<Entry> blocks) {
+		return new RoomSnapshot(room, size, palette, blocks);
 	}
 
 	public static boolean isPreviewId(int id) {
@@ -123,23 +129,28 @@ public class RoomSnapshot extends SavedData {
 		return blocks;
 	}
 
-	/** 收集方块中 tier 最高的至多十个碎片引擎的模拟结果。 */
-	public List<SimulationResult> topRepeaterResults(HolderLookup.Provider registries) {
+	/** 收集方块中 tier 最高的至多十个碎片引擎的复制物品。 */
+	public List<ItemStack> topRepeaterResults(HolderLookup.Provider registries) {
 		RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
-		List<SimulationResult> results = new ArrayList<>();
+		List<ItemStack> results = new ArrayList<>();
 		for (Entry entry : blocks) {
-			if (!CoreModule.REPEATER.is(palette.get(entry.state()).getBlock())) {
+			BlockState state = palette.get(entry.state());
+			if (!CoreModule.REPEATER.is(state.getBlock())) {
 				continue;
 			}
-			CompoundTag tag = entry.nbt().flatMap(nbt -> nbt.getCompound("result")).orElse(null);
+			CompoundTag tag = entry.nbt().orElse(null);
 			if (tag == null) {
 				continue;
 			}
-			SimulationResult.CODEC.parse(ops, tag).result().ifPresent(results::add);
+			ItemStack stack = RepeaterBlock.createCloneStack(state, tag, ops);
+			if (stack.get(CoreModule.SIMULATION_RESULT.get()) == null) {
+				continue;
+			}
+			results.add(stack);
 		}
-		results.sort(Comparator.comparingInt(SimulationResult::tier).reversed());
-		if (results.size() > 10) {
-			return new ArrayList<>(results.subList(0, 10));
+		results.sort(Comparator.comparingInt((ItemStack stack) -> stack.get(CoreModule.SIMULATION_RESULT.get()).tier()).reversed());
+		if (results.size() > 100) {
+			return new ArrayList<>(results.subList(0, 100));
 		}
 		return results;
 	}

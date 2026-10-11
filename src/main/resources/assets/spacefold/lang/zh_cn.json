@@ -17,7 +17,9 @@
 	"gui.spacefold.factory": "划片炉",
 	"gui.spacefold.details": "材料清单",
 	"gui.spacefold.details.materials": "材料",
+	"gui.spacefold.details.materials_empty": "材料列表为空",
 	"gui.spacefold.details.space": "空间",
+	"gui.spacefold.details.no_snapshot": "没有可用的空间快照",
 	"gui.spacefold.material_progress": "%s / %s（%s%%）",
 	"gui.spacefold.repeater_config": "配置碎片引擎",
 	"gui.spacefold.repeater_inputs_tip": "进料：物品数量 = 每秒消耗数",
@@ -75,6 +77,7 @@
 	"command.spacefold.no_room": "此处没有找到碎片",
 	"command.spacefold.check_room.valid": "碎片合法",
 	"command.spacefold.check_room.invalid": "碎片不合法：已高亮问题方块",
+	"command.spacefold.gen_rooms.success": "已生成 %s 个房间快照，根快照 id=%s，新碎片 #%s",
 	"dimension.spacefold.plan": "碎片域",
 	"dimension.spacefold.simulate": "测试域"
 }

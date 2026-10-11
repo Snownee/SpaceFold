@@ -116,6 +116,7 @@ publishMods {
         requires("kiwi-fabric")
         requires("jade")
         requires("joy-of-painting")
+        requires("athena")
     }
     modrinth {
         projectId = "22Tuwa3i"
@@ -127,5 +128,6 @@ publishMods {
         requires("kiwi")
         requires("jade")
         requires("joy-of-painting")
+        requires("athena-ctm")
     }
 }

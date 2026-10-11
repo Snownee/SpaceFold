@@ -6,6 +6,7 @@ import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
 import snownee.kiwi.Mod;
+import snownee.kiwi.loader.Platform;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
 import snownee.spacefold.command.ServerCommand;
@@ -26,7 +27,9 @@ public class CommonProxy implements ModInitializer {
 		PlanConfinement.init();
 		SimulateMode.init();
 		SimulationManager.init();
-		PaintConversion.init();
+		if (Platform.isModLoaded("xercapaint")) {
+			PaintConversion.init();
+		}
 		CommandRegistrationCallback.EVENT.register(ServerCommand::register);
 	}
 }

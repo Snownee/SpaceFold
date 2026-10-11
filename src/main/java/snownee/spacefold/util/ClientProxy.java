@@ -28,25 +28,26 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import snownee.kiwi.loader.Platform;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
 import snownee.spacefold.client.ClientSimulationTooltip;
 import snownee.spacefold.client.FacingCtmModel;
 import snownee.spacefold.client.FactoryScreen;
-import snownee.spacefold.client.ViewDetailsKey;
 import snownee.spacefold.client.RepeaterScreen;
 import snownee.spacefold.client.SimulationHud;
 import snownee.spacefold.client.SimulationTooltip;
 import snownee.spacefold.client.SimulatorScreen;
+import snownee.spacefold.client.ViewDetailsKey;
 import snownee.spacefold.client.paint.PaintAtlas;
-import snownee.spacefold.client.room.RoomSkyRenderer;
-import snownee.spacefold.client.room.VoxelRoomRenderer;
 import snownee.spacefold.client.paint.PaintRoot;
 import snownee.spacefold.client.paint.RepeaterPaintSpecialRenderer;
 import snownee.spacefold.client.particle.CubeParticle;
 import snownee.spacefold.client.particle.CubeParticleGroup;
 import snownee.spacefold.client.particle.CubeParticleProvider;
 import snownee.spacefold.client.particle.CubeRenderType;
+import snownee.spacefold.client.room.RoomSkyRenderer;
+import snownee.spacefold.client.room.VoxelRoomRenderer;
 import snownee.spacefold.client.sky.FogVolume;
 import snownee.spacefold.command.ClientCommand;
 import snownee.spacefold.dim.SimulationResult;
@@ -64,8 +65,8 @@ public class ClientProxy implements ClientModInitializer {
 		float progress = ViewDetailsKey.progress();
 		int shade = 0xAA + Math.round((0xFF - 0xAA) * progress);
 		lines.add(Component.translatable(
-				"gui.spacefold.repeater_materials_hint",
-				Component.keybind("key.spacefold.view_details"))
+						"gui.spacefold.repeater_materials_hint",
+						Component.keybind("key.spacefold.view_details"))
 				.withColor(shade << 16 | shade << 8 | shade));
 	}
 
@@ -98,7 +99,9 @@ public class ClientProxy implements ClientModInitializer {
 	@Override
 	public void onInitializeClient() {
 		ViewDetailsKey.register();
-		FacingCtmModel.register();
+		if (Platform.isModLoaded("athena")) {
+			FacingCtmModel.register();
+		}
 		MenuScreens.register(CoreModule.SIMULATOR_MENU.getOrCreate(), SimulatorScreen::new);
 		MenuScreens.register(CoreModule.FACTORY_MENU.getOrCreate(), FactoryScreen::new);
 		MenuScreens.register(CoreModule.REPEATER_MENU.getOrCreate(), RepeaterScreen::new);

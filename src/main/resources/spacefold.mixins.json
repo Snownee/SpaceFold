@@ -11,6 +11,7 @@
 	],
 	"client": [
 		"client.AbstractContainerScreenMixin",
+		"client.AbstractScrollAreaMixin",
 		"client.ClientPacketListenerMixin",
 		"client.ItemStackMixin",
 		"client.LevelRendererMixin",

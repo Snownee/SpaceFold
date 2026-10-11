@@ -143,8 +143,8 @@ public class SimulatorBlock extends HorizontalDirectionalBlock implements Entity
 	@Override
 	protected ItemStack getCloneItemStack(LevelReader level, BlockPos pos, BlockState state, boolean includeData) {
 		ItemStack stack = super.getCloneItemStack(level, pos, state, includeData);
-		if (includeData && level instanceof Level realLevel
-				&& realLevel.getBlockEntity(pos) instanceof SimulatorBlockEntity blockEntity && blockEntity.getRoomIndex() >= 0) {
+		if (level instanceof Level realLevel && realLevel.getBlockEntity(pos) instanceof SimulatorBlockEntity blockEntity &&
+				blockEntity.getRoomIndex() >= 0) {
 			stack.set(CoreModule.ROOM_SIDE.get(), RoomManager.isRoomDimension(realLevel.dimension()));
 			attachResult(realLevel, blockEntity, stack);
 		}

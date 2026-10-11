@@ -26,8 +26,13 @@ public final class PreviewCache {
 	private static final IntSet pendingSnapshots = new IntOpenHashSet();
 	private static String snapshotYaws = "";
 	private static Int2FloatMap parsedYaws = new Int2FloatOpenHashMap();
+	private static int version;
 
 	private PreviewCache() {
+	}
+
+	public static int version() {
+		return version;
 	}
 
 	public static @Nullable RoomSnapshot getSnapshot(int id) {
@@ -45,12 +50,18 @@ public final class PreviewCache {
 		pendingSnapshots.remove(id);
 		if (snapshot != null) {
 			snapshots.put(id, snapshot);
+			if (RoomSnapshot.isPreviewId(id)) {
+				version++;
+			}
 		}
 	}
 
 	public static void invalidate(int id) {
 		snapshots.remove(id);
 		pendingSnapshots.remove(id);
+		if (RoomSnapshot.isPreviewId(id)) {
+			version++;
+		}
 	}
 
 	public static float getYaw(int snapshotId) {

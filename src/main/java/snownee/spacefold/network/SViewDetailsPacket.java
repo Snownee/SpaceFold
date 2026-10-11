@@ -19,7 +19,7 @@ import snownee.spacefold.client.DetailsScreen;
 import snownee.spacefold.dim.SimulationResult;
 
 @KiwiPacket
-public record SViewDetailsPacket(List<Entry> entries, boolean showProgress, int snapshotId) implements CustomPacketPayload {
+public record SViewDetailsPacket(List<Entry> entries, boolean showProgress, int snapshotId, ItemStack stack) implements CustomPacketPayload {
 	public static final Type<SViewDetailsPacket> TYPE = new Type<>(SpaceFold.id("view_details"));
 
 	@Override
@@ -57,6 +57,7 @@ public record SViewDetailsPacket(List<Entry> entries, boolean showProgress, int 
 				Entry.STREAM_CODEC.apply(ByteBufCodecs.list()), SViewDetailsPacket::entries,
 				ByteBufCodecs.BOOL, SViewDetailsPacket::showProgress,
 				ByteBufCodecs.VAR_INT, SViewDetailsPacket::snapshotId,
+				ItemStack.OPTIONAL_STREAM_CODEC, SViewDetailsPacket::stack,
 				SViewDetailsPacket::new);
 
 		@Override
@@ -64,7 +65,12 @@ public record SViewDetailsPacket(List<Entry> entries, boolean showProgress, int 
 			context.execute(() -> {
 				Minecraft minecraft = Minecraft.getInstance();
 				minecraft.player.closeContainer();
-				minecraft.setScreen(new DetailsScreen(packet.entries(), packet.showProgress(), packet.snapshotId()));
+				minecraft.setScreen(new DetailsScreen(
+						packet.entries(),
+						packet.showProgress(),
+						packet.snapshotId(),
+						-1,
+						packet.stack()));
 			});
 		}
 

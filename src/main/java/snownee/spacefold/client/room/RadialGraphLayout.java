@@ -1,12 +1,16 @@
 package snownee.spacefold.client.room;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.function.IntFunction;
 
 import org.jspecify.annotations.Nullable;
 
 import net.minecraft.util.Util;
 import net.minecraft.world.item.ItemStack;
+import snownee.spacefold.CoreModule;
 import snownee.spacefold.dim.SimulationResult;
 
 /**
@@ -19,13 +23,15 @@ public final class RadialGraphLayout {
 	private static final float ALPHA_DECAY = 0.99F;
 	private static final float ALPHA_MIN = 0.005F;
 	private static final float FRICTION = 0.9F;
-	private static final float CHARGE = 2400.0F;
-	private static final float LEAF_LINK_DISTANCE = 110.0F;
-	private static final float BRANCH_LINK_DISTANCE = 160.0F;
+	private static final float CHARGE = 3600.0F;
+	private static final float LEAF_LINK_DISTANCE = 100.0F;
+	private static final float SUBTREE_LINK_SCALE = 14.0F;
+	private static final float GRAVITY_SCALE = 0.5F;
 	private static final long TICK_MS = 16L;
 	private static final int MAX_TICKS_PER_FRAME = 4;
 
 	private final List<Node> nodes = new ArrayList<>();
+	private final Set<Integer> visitedSnapshotIds = new HashSet<>();
 	private @Nullable Node root;
 	private float alpha;
 	private float gravity;
@@ -36,26 +42,68 @@ public final class RadialGraphLayout {
 		return nodes;
 	}
 
-	public void reset(int rootSnapshotId, List<SimulationResult> leaves) {
+	public @Nullable Node root() {
+		return root;
+	}
+
+	public void reset(int rootSnapshotId, int rootTier, ItemStack rootIcon, IntFunction<List<ItemStack>> childrenLookup) {
 		nodes.clear();
-		root = new Node(null, rootSnapshotId, 0, ItemStack.EMPTY);
+		visitedSnapshotIds.clear();
+		root = new Node(null, rootSnapshotId, rootTier, rootIcon);
 		root.fixed = true;
 		root.x = root.px = 0.0F;
 		root.y = root.py = 0.0F;
 		nodes.add(root);
-		int count = leaves.size();
-		for (int i = 0; i < count; i++) {
-			SimulationResult result = leaves.get(i);
-			Node node = new Node(root, result.snapshotId(), result.tier(), ItemStack.EMPTY);
-			double angle = Math.PI * 2 * i / Math.max(1, count);
-			node.x = (float) Math.cos(angle) * LEAF_LINK_DISTANCE;
-			node.y = (float) Math.sin(angle) * LEAF_LINK_DISTANCE;
-			node.px = node.x;
-			node.py = node.y;
-			root.children.add(node);
-			nodes.add(node);
+		if (rootSnapshotId >= 0) {
+			visitedSnapshotIds.add(rootSnapshotId);
 		}
+		expandPending(childrenLookup);
 		structureChanged();
+	}
+
+	/**
+	 * 为所有尚未展开的结点挂载其子结点。childrenLookup 对给定快照返回子（repeater 复制物品）；
+	 * 返回 null 表示对应快照尚未加载（留待下次重试），返回空列表表示已加载但无子结点。
+	 */
+	public boolean expandPending(IntFunction<List<ItemStack>> childrenLookup) {
+		boolean changed = false;
+		for (int index = 0; index < nodes.size(); index++) {
+			Node node = nodes.get(index);
+			if (node.expanded || node.snapshotId < 0) {
+				continue;
+			}
+			List<ItemStack> children = childrenLookup.apply(node.snapshotId);
+			if (children == null) {
+				continue;
+			}
+			node.expanded = true;
+			int count = children.size();
+			double baseAngle = node.parent == null
+					? 0.0
+					: Math.atan2(node.y - node.parent.y, node.x - node.parent.x);
+			for (int i = 0; i < count; i++) {
+				ItemStack icon = children.get(i);
+				SimulationResult result = icon.get(CoreModule.SIMULATION_RESULT.get());
+				int snapshotId = result == null ? SimulationResult.NO_SNAPSHOT : result.snapshotId();
+				if (snapshotId >= 0 && !visitedSnapshotIds.add(snapshotId)) {
+					continue;
+				}
+				int tier = result == null ? 1 : result.tier();
+				Node child = new Node(node, snapshotId, tier, icon);
+				double angle = count == 1 ? baseAngle : baseAngle + Math.PI * 2 * i / count;
+				child.x = node.x + (float) Math.cos(angle) * LEAF_LINK_DISTANCE;
+				child.y = node.y + (float) Math.sin(angle) * LEAF_LINK_DISTANCE;
+				child.px = child.x;
+				child.py = child.y;
+				node.children.add(child);
+				nodes.add(child);
+				changed = true;
+			}
+		}
+		if (changed) {
+			structureChanged();
+		}
+		return changed;
 	}
 
 	public Node addChild(Node parent, ItemStack icon) {
@@ -106,10 +154,22 @@ public final class RadialGraphLayout {
 		for (Node node : nodes) {
 			node.weight = node.children.size() + (node.parent == null ? 0 : 1);
 		}
+		if (root != null) {
+			computeSubtreeSize(root);
+		}
 		alpha = ALPHA_START;
-		gravity = (float) (Math.atan(nodes.size() / 50.0) / Math.PI * 0.4);
+		gravity = (float) (Math.atan(nodes.size() / 50.0) / Math.PI * 0.4) * GRAVITY_SCALE;
 		accumulator = 0.0;
 		updatedAt = Util.getMillis();
+	}
+
+	private int computeSubtreeSize(Node node) {
+		int size = 0;
+		for (Node child : node.children) {
+			size += 1 + computeSubtreeSize(child);
+		}
+		node.subtreeSize = size;
+		return size;
 	}
 
 	public void simulate() {
@@ -164,7 +224,7 @@ public final class RadialGraphLayout {
 				continue;
 			}
 			float dist = (float) Math.sqrt(distSq);
-			float distance = node.children.isEmpty() ? LEAF_LINK_DISTANCE : BRANCH_LINK_DISTANCE;
+			float distance = LEAF_LINK_DISTANCE + SUBTREE_LINK_SCALE * (float) Math.sqrt(node.subtreeSize);
 			float scalar = alpha * (dist - distance) / dist;
 			float dx = x * scalar;
 			float dy = y * scalar;
@@ -231,11 +291,13 @@ public final class RadialGraphLayout {
 		private final int tier;
 		private final ItemStack icon;
 		private int weight = 1;
+		private int subtreeSize;
 		private float x;
 		private float y;
 		private float px;
 		private float py;
 		private boolean fixed;
+		private boolean expanded;
 
 		private Node(@Nullable Node parent, int snapshotId, int tier, ItemStack icon) {
 			this.parent = parent;

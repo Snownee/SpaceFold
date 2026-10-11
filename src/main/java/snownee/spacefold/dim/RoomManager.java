@@ -22,6 +22,7 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
+import net.minecraft.util.Mth;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.ChunkPos;
@@ -80,7 +81,7 @@ public final class RoomManager {
 				return;
 			}
 			Vec3 landing = safeLanding(destination, link);
-			teleport(player, destination, landing.x, landing.y, landing.z, player.getYRot(), 0);
+			teleportLookingAt(player, destination, landing.x, landing.y, landing.z, link);
 			return;
 		}
 
@@ -292,6 +293,10 @@ public final class RoomManager {
 		return list;
 	}
 
+	public static int createRoom(ServerLevel plan, UUID creator) {
+		return allocate(plan, creator);
+	}
+
 	private static int allocate(ServerLevel plan, UUID creator) {
 		PlanRooms rooms = rooms(plan);
 		int index = rooms.nextIndex++;
@@ -405,6 +410,41 @@ public final class RoomManager {
 		return id;
 	}
 
+	public static int createSnapshotId(ServerLevel level) {
+		PlanRooms rooms = rooms(level);
+		int id = rooms.nextSnapshotId++;
+		rooms.setDirty();
+		return id;
+	}
+
+	public static void putSnapshot(ServerLevel level, int id, RoomSnapshot snapshot) {
+		level.getServer().getDataStorage().set(RoomSnapshot.type(id), snapshot);
+	}
+
+	public static void placeSnapshot(ServerLevel plan, int room, RoomSnapshot snapshot) {
+		BlockPos origin = roomOrigin(room);
+		plan.getChunkAt(origin);
+		HolderLookup.Provider registries = plan.registryAccess();
+		RoomProtection.runInternal(() -> {
+			for (RoomSnapshot.Entry entry : snapshot.blocks()) {
+				BlockPos at = origin.offset(entry.x(), entry.y(), entry.z());
+				BlockState state = snapshot.palette().get(entry.state());
+				plan.setBlock(at, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+				CompoundTag tag = entry.nbt().orElse(null);
+				if (tag != null) {
+					BlockEntity blockEntity = BlockEntity.loadStatic(at, state, tag, registries);
+					if (blockEntity != null) {
+						plan.setBlockEntity(blockEntity);
+					}
+				}
+			}
+		});
+		BlockPos inner = innerPos(room);
+		if (plan.getBlockEntity(inner) instanceof SimulatorBlockEntity simulator) {
+			simulator.setRoom(room);
+		}
+	}
+
 	public static @Nullable RoomSnapshot snapshot(ServerLevel level, int id) {
 		if (id < 0) {
 			return null;
@@ -445,7 +485,7 @@ public final class RoomManager {
 		((SimulatorBlockEntity) Objects.requireNonNull(plan.getBlockEntity(inner))).setRoom(room);
 	}
 
-	private static @Nullable Direction inwardDirection(int dx, int dy, int dz) {
+	static @Nullable Direction inwardDirection(int dx, int dy, int dz) {
 		int max = Plan.ROOM_SIZE - 1;
 		boolean xMin = dx == 0;
 		boolean xMax = dx == max;
@@ -549,11 +589,21 @@ public final class RoomManager {
 		if (level == null) {
 			return;
 		}
-		teleport(player, level, origin.getX() - 1.5, Plan.FLOOR_Y + 2.0, origin.getZ() + Plan.ROOM_SIZE / 2.0, -90.0F, 0);
+		teleportLookingAt(player, level, origin.getX() - 1.5, Plan.FLOOR_Y + 2.0, origin.getZ() + Plan.ROOM_SIZE / 2.0, innerPos(room));
 	}
 
 	static void teleport(ServerPlayer player, ServerLevel level, double x, double y, double z, float yRot, float xRot) {
 		player.teleport(new TeleportTransition(level, new Vec3(x, y, z), Vec3.ZERO, yRot, xRot, Set.of(), TeleportTransition.DO_NOTHING));
+	}
+
+	private static void teleportLookingAt(ServerPlayer player, ServerLevel level, double x, double y, double z, BlockPos target) {
+		double dx = target.getX() + 0.5 - x;
+		double dy = target.getY() + 0.5 - (y + player.getEyeHeight());
+		double dz = target.getZ() + 0.5 - z;
+		double horizontal = Math.sqrt(dx * dx + dz * dz);
+		float yRot = (float) (Mth.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0F;
+		float xRot = (float) -(Mth.atan2(dy, horizontal) * (180.0 / Math.PI));
+		teleport(player, level, x, y, z, yRot, xRot);
 	}
 
 	private static Vec3 safeLanding(ServerLevel level, BlockPos link) {
