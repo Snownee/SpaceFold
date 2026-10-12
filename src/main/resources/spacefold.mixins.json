@@ -14,6 +14,7 @@
 		"client.AbstractScrollAreaMixin",
 		"client.ClientPacketListenerMixin",
 		"client.ItemStackMixin",
+		"client.ItemEntityRendererMixin",
 		"client.LevelRendererMixin",
 		"client.LocalPlayerMixin",
 		"client.MultiPlayerGameModeMixin",

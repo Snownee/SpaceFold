@@ -3,18 +3,22 @@ package snownee.spacefold.menu;
 import net.minecraft.world.Container;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import snownee.spacefold.block.entity.FactoryBlockEntity;
 
 public class FactorySlot extends Slot {
-	private final boolean template;
+	private final int maxStackSize;
 
-	public FactorySlot(Container container, int slot, int x, int y, boolean template) {
+	public FactorySlot(Container container, int slot, int x, int y, int maxStackSize) {
 		super(container, slot, x, y);
-		this.template = template;
+		this.maxStackSize = maxStackSize;
 	}
 
 	@Override
 	public boolean mayPlace(ItemStack itemStack) {
-		return template && FactoryBlockEntity.isTemplateStack(itemStack);
+		return container.canPlaceItem(getContainerSlot(), itemStack);
+	}
+
+	@Override
+	public int getMaxStackSize() {
+		return maxStackSize;
 	}
 }

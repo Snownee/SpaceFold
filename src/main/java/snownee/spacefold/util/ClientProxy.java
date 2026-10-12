@@ -6,6 +6,7 @@ import java.util.Map;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
@@ -13,6 +14,7 @@ import net.fabricmc.fabric.api.client.particle.v1.ParticleGroupRegistry;
 import net.fabricmc.fabric.api.client.particle.v1.ParticleProviderRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.ClientTooltipComponentCallback;
 import net.fabricmc.fabric.api.client.rendering.v1.PictureInPictureRendererRegistry;
+import net.fabricmc.fabric.api.client.rendering.v1.RenderStateDataKey;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
@@ -25,14 +27,17 @@ import net.minecraft.client.renderer.item.ItemModel;
 import net.minecraft.client.renderer.special.SpecialModelRenderers;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.Unit;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import snownee.kiwi.loader.ClientPlatform;
 import snownee.kiwi.loader.Platform;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
 import snownee.spacefold.client.ClientSimulationTooltip;
 import snownee.spacefold.client.FacingCtmModel;
+import snownee.spacefold.client.FactoryRenderer;
 import snownee.spacefold.client.FactoryScreen;
 import snownee.spacefold.client.RepeaterScreen;
 import snownee.spacefold.client.SimulationHud;
@@ -42,6 +47,10 @@ import snownee.spacefold.client.ViewDetailsKey;
 import snownee.spacefold.client.paint.PaintAtlas;
 import snownee.spacefold.client.paint.PaintRoot;
 import snownee.spacefold.client.paint.RepeaterPaintSpecialRenderer;
+import snownee.spacefold.client.particle.BeamParticle;
+import snownee.spacefold.client.particle.BeamParticleGroup;
+import snownee.spacefold.client.particle.BeamParticleProvider;
+import snownee.spacefold.client.particle.BeamRenderType;
 import snownee.spacefold.client.particle.CubeParticle;
 import snownee.spacefold.client.particle.CubeParticleGroup;
 import snownee.spacefold.client.particle.CubeParticleProvider;
@@ -53,6 +62,12 @@ import snownee.spacefold.command.ClientCommand;
 import snownee.spacefold.dim.SimulationResult;
 
 public class ClientProxy implements ClientModInitializer {
+	public static final RenderStateDataKey<Unit> NO_BOB = RenderStateDataKey.create(() -> "no_bob");
+
+	public static void registerFactoryRenderer() {
+		ClientPlatform.registerBlockEntityRenderer(CoreModule.FACTORY_BE.getOrCreate(), FactoryRenderer::new);
+	}
+
 	private static void appendSimulationTooltip(ItemStack stack, Item.TooltipContext context, TooltipFlag flag, List<Component> lines) {
 		SimulationResult result = stack.get(CoreModule.SIMULATION_RESULT.get());
 		if (result == null) {
@@ -98,6 +113,9 @@ public class ClientProxy implements ClientModInitializer {
 
 	@Override
 	public void onInitializeClient() {
+		if (!Platform.isProduction() && Boolean.getBoolean("spacefold.autoQuit")) {
+			ClientLifecycleEvents.CLIENT_STARTED.register(Minecraft::stop);
+		}
 		ViewDetailsKey.register();
 		if (Platform.isModLoaded("athena")) {
 			FacingCtmModel.register();
@@ -106,8 +124,11 @@ public class ClientProxy implements ClientModInitializer {
 		MenuScreens.register(CoreModule.FACTORY_MENU.getOrCreate(), FactoryScreen::new);
 		MenuScreens.register(CoreModule.REPEATER_MENU.getOrCreate(), RepeaterScreen::new);
 		ParticleProviderRegistry.getInstance().register(CoreModule.CUBE.getOrCreate(), new CubeParticleProvider());
+		ParticleProviderRegistry.getInstance().register(CoreModule.BEAM.getOrCreate(), new BeamParticleProvider());
 		ParticleGroupRegistry.register(CubeParticle.RENDER_TYPE, CubeParticleGroup::new);
+		ParticleGroupRegistry.register(BeamParticle.RENDER_TYPE, BeamParticleGroup::new);
 		CubeRenderType.bootstrap();
+		BeamRenderType.bootstrap();
 		FogVolume.init();
 		HudElementRegistry.attachElementAfter(VanillaHudElements.SCOREBOARD, SpaceFold.id("simulation_rates"), new SimulationHud());
 		ItemTooltipCallback.EVENT.register(ClientProxy::appendSimulationTooltip);

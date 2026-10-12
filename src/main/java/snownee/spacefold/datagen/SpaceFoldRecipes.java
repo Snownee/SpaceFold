@@ -52,7 +52,7 @@ public class SpaceFoldRecipes extends FabricRecipeProvider {
 						.unlockedBy("has_spacetime_anchor", has(CoreModule.SIMULATOR.get()))
 						.save(output);
 
-				shaped(RecipeCategory.MISC, CoreModule.FACTORY.get())
+				shaped(RecipeCategory.MISC, CoreModule.FACTORY.get(), 2)
 						.define('R', CoreModule.REPEATER.get())
 						.define('A', Items.AMETHYST_SHARD)
 						.define('I', Items.IRON_INGOT)

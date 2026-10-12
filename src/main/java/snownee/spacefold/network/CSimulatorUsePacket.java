@@ -11,7 +11,6 @@ import snownee.kiwi.network.KiwiPacket;
 import snownee.kiwi.network.PayloadContext;
 import snownee.kiwi.network.PlayPacketHandler;
 import snownee.spacefold.SpaceFold;
-import snownee.spacefold.block.SimulatorBlock;
 import snownee.spacefold.dim.RoomManager;
 import snownee.spacefold.dim.Simulate;
 
@@ -41,9 +40,6 @@ public record CSimulatorUsePacket(BlockPos pos, boolean windows) implements Cust
 					return;
 				}
 				BlockPos pos = packet.pos();
-				if (!(level.getBlockState(pos).getBlock() instanceof SimulatorBlock)) {
-					return;
-				}
 				if (!player.isWithinBlockInteractionRange(pos, 1.0D)) {
 					return;
 				}

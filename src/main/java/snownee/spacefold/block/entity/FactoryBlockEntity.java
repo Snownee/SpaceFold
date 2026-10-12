@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
+import java.util.function.Predicate;
 
 import org.jspecify.annotations.Nullable;
 
@@ -16,17 +16,24 @@ import net.fabricmc.fabric.api.transfer.v1.storage.StorageView;
 import net.fabricmc.fabric.api.transfer.v1.transaction.TransactionContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.core.NonNullList;
+import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.CollisionContext;
 import snownee.kiwi.block.entity.ModBlockEntity;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFoldConfig;
@@ -34,28 +41,35 @@ import snownee.spacefold.dim.SimulationResult;
 import snownee.spacefold.network.SViewDetailsPacket;
 import snownee.spacefold.paint.FacePaint;
 import snownee.spacefold.paint.RepeaterPaints;
+import snownee.spacefold.particle.BeamParticleOptions;
 import team.reborn.energy.api.EnergyStorage;
 
 public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	public static final int TEMPLATE_SLOT = 0;
-	public static final int OUTPUT_SLOT = 1;
+	public static final int MATERIAL_SLOT = 1;
 
 	public static final int ERROR_NONE = 0;
 	public static final int ERROR_INVALID = 1;
 	public static final int ERROR_ROOM_SIDE = 2;
 	public static final int ERROR_NO_RESULT = 3;
 	public static final int ERROR_FAILED = 4;
+	public static final int ERROR_NO_RECEIVER = 5;
+	public static final int ERROR_OBSTRUCTED = 6;
 
-	private final NonNullList<ItemStack> items = NonNullList.withSize(2, ItemStack.EMPTY);
+	private ItemStack item = ItemStack.EMPTY;
 	private final Object2LongMap<ItemVariant> materials = new Object2LongOpenHashMap<>();
 	private final Storage<ItemVariant> itemStorage = new FactoryItemStorage();
 	private final EnergyStorage energyStorage = new FactoryEnergyStorage();
 	private long energy;
 	private int progress;
+	private int cooldown;
 	private int errorCode;
+	private long shakeTime = -1;
+	private long progressTime = -1;
+	private @Nullable BlockPos cachedReceiverPos;
 	private @Nullable SimulationResult templateResult;
-	private @Nullable Component templateName;
-	private Map<Direction, FacePaint> templatePaints = RepeaterPaints.EMPTY;
+	private ItemStack pendingItem = ItemStack.EMPTY;
+	private int pendingTicks;
 	private boolean templateDirty = true;
 
 	public FactoryBlockEntity(BlockPos pos, BlockState state) {
@@ -68,19 +82,28 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	}
 
 	public static boolean isTemplateStack(ItemStack stack) {
-		return isRepeater(stack) || isSimulator(stack);
-	}
-
-	private static boolean isRepeater(ItemStack stack) {
-		return stack.getItem() == CoreModule.REPEATER.get().asItem();
-	}
-
-	private static boolean isSimulator(ItemStack stack) {
-		return stack.getItem() == CoreModule.SIMULATOR.get().asItem();
+		return CoreModule.REPEATER.is(stack) || CoreModule.SIMULATOR.is(stack);
 	}
 
 	public int getErrorCode() {
 		return errorCode;
+	}
+
+	public int getProgress() {
+		return progress;
+	}
+
+	public long getShakeTime() {
+		return shakeTime;
+	}
+
+	public long getProgressTime() {
+		return progressTime;
+	}
+
+	private void shake() {
+		shakeTime = level.getGameTime();
+		refresh();
 	}
 
 	public ContainerData data() {
@@ -115,33 +138,100 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	}
 
 	public void tick() {
-		if (!(level instanceof ServerLevel serverLevel)) {
+		if (!pendingItem.isEmpty()) {
+			if (--pendingTicks <= 0) {
+				ItemStack stack = pendingItem;
+				pendingItem = ItemStack.EMPTY;
+				setItem(TEMPLATE_SLOT, stack);
+				shake();
+			}
 			return;
 		}
 		if (templateDirty) {
 			templateDirty = false;
 			resolveTemplate();
+			refresh();
 		}
-		if (errorCode != ERROR_NONE || templateResult == null) {
+		if (templateResult == null || (errorCode != ERROR_NONE && errorCode != ERROR_NO_RECEIVER && errorCode != ERROR_OBSTRUCTED)) {
 			return;
 		}
-		if (!canProduce()) {
+		if (energy < SpaceFoldConfig.factoryEnergyPerTick) {
 			return;
 		}
-		if (energy < SpaceFoldConfig.factoryEnergyPerCraft) {
-			return;
-		}
-		if (!consumeProgress(progress + 1)) {
-			return;
-		}
-		progress++;
 		int duration = Math.max(1, SpaceFoldConfig.factoryDurationTicks);
-		if (progress >= duration) {
+		if (progress + 1 >= duration) {
+			if (cooldown > 0) {
+				cooldown--;
+				return;
+			}
+			FactoryBlockEntity receiver = findEmptyFactory();
+			if (receiver == null) {
+				cooldown = 10;
+				return;
+			}
+			if (!consumeProgress(progress + 1)) {
+				return;
+			}
 			progress = 0;
-			energy -= SpaceFoldConfig.factoryEnergyPerCraft;
-			produce();
+			produce(receiver);
+		} else {
+			if (!consumeProgress(progress + 1)) {
+				return;
+			}
+			progress++;
+			progressTime = level.getGameTime();
+			refresh();
 		}
 		setChanged();
+	}
+
+	private @Nullable FactoryBlockEntity findEmptyFactory() {
+		if (cachedReceiverPos != null && level.isLoaded(cachedReceiverPos) &&
+				level.getBlockEntity(cachedReceiverPos) instanceof FactoryBlockEntity cached && cached.isEmpty() &&
+				hasClearPath(cachedReceiverPos)) {
+			errorCode = ERROR_NONE;
+			return cached;
+		}
+		BlockPos origin = getBlockPos();
+		FactoryBlockEntity nearest = null;
+		double nearestDistance = Double.MAX_VALUE;
+		boolean obstructed = false;
+		Predicate<Holder<PoiType>> predicate = holder -> holder.is(CoreModule.FACTORY_POI);
+		for (BlockPos candidate : ((ServerLevel) level).getPoiManager()
+				.findAll(predicate, pos -> !pos.equals(origin), origin, 10, PoiManager.Occupancy.ANY)
+				.toList()) {
+			if (!(level.getBlockEntity(candidate) instanceof FactoryBlockEntity factory) || !factory.isEmpty()) {
+				continue;
+			}
+			if (!hasClearPath(candidate)) {
+				obstructed = true;
+				continue;
+			}
+			double distance = candidate.distSqr(origin);
+			if (distance < nearestDistance) {
+				nearestDistance = distance;
+				nearest = factory;
+			}
+		}
+		cachedReceiverPos = nearest == null ? null : nearest.getBlockPos();
+		if (nearest == null) {
+			errorCode = obstructed ? ERROR_OBSTRUCTED : ERROR_NO_RECEIVER;
+		} else {
+			errorCode = ERROR_NONE;
+		}
+		return nearest;
+	}
+
+	private boolean hasClearPath(BlockPos receiverPos) {
+		Vec3 from = Vec3.atCenterOf(getBlockPos().above());
+		Vec3 to = Vec3.atCenterOf(receiverPos.above());
+		BlockHitResult hit = level.clip(new ClipContext(
+				from,
+				to,
+				ClipContext.Block.COLLIDER,
+				ClipContext.Fluid.NONE,
+				CollisionContext.empty()));
+		return hit.getType() == HitResult.Type.MISS;
 	}
 
 	private long requiredAmount(ItemVariant variant) {
@@ -149,10 +239,9 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 			return 0;
 		}
 		long total = 0;
-		int amount = Math.max(1, SpaceFoldConfig.factoryOutputPerCraft);
 		for (SimulationResult.Material material : templateResult.materials()) {
 			if (material.item().equals(variant)) {
-				total += (long) material.count() * amount;
+				total += material.count();
 			}
 		}
 		return total;
@@ -175,10 +264,9 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 		if (templateResult == null) {
 			return List.of();
 		}
-		int amount = Math.max(1, SpaceFoldConfig.factoryOutputPerCraft);
 		List<SViewDetailsPacket.Entry> entries = new ArrayList<>();
 		for (SimulationResult.Material material : templateResult.materials()) {
-			long total = (long) material.count() * amount;
+			long total = material.count();
 			long provided = Math.min(total, materials.getLong(material.item()) + consumedAmount(material.item()));
 			entries.add(new SViewDetailsPacket.Entry(material.item(), provided, total));
 		}
@@ -187,10 +275,9 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 
 	private boolean consumeProgress(int nextProgress) {
 		int duration = Math.max(1, SpaceFoldConfig.factoryDurationTicks);
-		int amount = Math.max(1, SpaceFoldConfig.factoryOutputPerCraft);
 		Object2LongMap<ItemVariant> deltas = new Object2LongOpenHashMap<>();
 		for (SimulationResult.Material material : templateResult.materials()) {
-			long total = (long) material.count() * amount;
+			long total = material.count();
 			long delta = total * nextProgress / duration - total * (nextProgress - 1) / duration;
 			if (delta > 0) {
 				deltas.mergeLong(material.item(), delta, Long::sum);
@@ -204,6 +291,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 		for (Object2LongMap.Entry<ItemVariant> entry : deltas.object2LongEntrySet()) {
 			materials.mergeLong(entry.getKey(), -entry.getLongValue(), Long::sum);
 		}
+		energy -= SpaceFoldConfig.factoryEnergyPerTick;
 		return true;
 	}
 
@@ -241,80 +329,63 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 
 	private void resolveTemplate() {
 		templateResult = null;
-		templateName = null;
-		templatePaints = RepeaterPaints.EMPTY;
 		errorCode = ERROR_NONE;
 		progress = 0;
-		ItemStack stack = items.get(TEMPLATE_SLOT);
-		if (!stack.isEmpty()) {
-			if (!isTemplateStack(stack)) {
+		if (!item.isEmpty()) {
+			if (!isTemplateStack(item)) {
 				errorCode = ERROR_INVALID;
-			} else if (stack.getOrDefault(CoreModule.ROOM_SIDE.get(), false)) {
+			} else if (item.getOrDefault(CoreModule.ROOM_SIDE.get(), false)) {
 				errorCode = ERROR_ROOM_SIDE;
 			} else {
-				SimulationResult result = stack.get(CoreModule.SIMULATION_RESULT.get());
+				SimulationResult result = item.get(CoreModule.SIMULATION_RESULT.get());
 				if (result == null) {
 					errorCode = ERROR_NO_RESULT;
 				} else if (result.failed()) {
 					errorCode = ERROR_FAILED;
 				} else {
 					templateResult = result;
-					templateName = stack.get(DataComponents.CUSTOM_NAME);
-					templatePaints = paintsOf(stack);
 				}
 			}
 		}
 		pruneMaterials();
 	}
 
-	private boolean canProduce() {
-		ItemStack output = items.get(OUTPUT_SLOT);
-		int amount = Math.max(1, SpaceFoldConfig.factoryOutputPerCraft);
-		int max = new ItemStack(CoreModule.REPEATER.get()).getMaxStackSize();
-		if (output.isEmpty()) {
-			return amount <= max;
-		}
-		if (output.getItem() != CoreModule.REPEATER.get().asItem()) {
-			return false;
-		}
-		if (!Objects.equals(output.get(CoreModule.SIMULATION_RESULT.get()), templateResult)) {
-			return false;
-		}
-		if (!Objects.equals(output.get(DataComponents.CUSTOM_NAME), templateName)) {
-			return false;
-		}
-		if (!Objects.equals(paintsOf(output), templatePaints)) {
-			return false;
-		}
-		return output.getCount() + amount <= max;
-	}
-
 	public boolean creativeInstantProduce() {
-		if (errorCode != ERROR_NONE || templateResult == null || !canProduce()) {
+		if ((errorCode != ERROR_NONE && errorCode != ERROR_NO_RECEIVER && errorCode != ERROR_OBSTRUCTED) || templateResult == null) {
+			return false;
+		}
+		FactoryBlockEntity receiver = findEmptyFactory();
+		if (receiver == null) {
 			return false;
 		}
 		progress = 0;
-		produce();
+		produce(receiver);
 		return true;
 	}
 
-	private void produce() {
-		int amount = Math.max(1, SpaceFoldConfig.factoryOutputPerCraft);
-		ItemStack output = items.get(OUTPUT_SLOT);
-		if (output.isEmpty()) {
-			ItemStack made = new ItemStack(CoreModule.REPEATER.get(), amount);
-			made.set(CoreModule.SIMULATION_RESULT.get(), templateResult);
-			if (templateName != null) {
-				made.set(DataComponents.CUSTOM_NAME, templateName);
-			}
-			if (!templatePaints.isEmpty()) {
-				made.set(CoreModule.REPEATER_PAINT.get(), templatePaints);
-			}
-			items.set(OUTPUT_SLOT, made);
-		} else {
-			output.grow(amount);
-		}
+	public void acceptPending(ItemStack stack, int ticks) {
+		pendingItem = stack;
+		pendingTicks = ticks;
 		setChanged();
+	}
+
+	private void produce(FactoryBlockEntity receiver) {
+		ItemStack made = new ItemStack(CoreModule.REPEATER.get(), 1);
+		made.set(CoreModule.SIMULATION_RESULT.get(), templateResult);
+		Component name = item.get(DataComponents.CUSTOM_NAME);
+		if (name != null) {
+			made.set(DataComponents.CUSTOM_NAME, name);
+		}
+		Map<Direction, FacePaint> paints = paintsOf(item);
+		if (!paints.isEmpty()) {
+			made.set(CoreModule.REPEATER_PAINT.get(), paints);
+		}
+		int duration = 10;
+		receiver.acceptPending(made, duration);
+		shake();
+		Vec3 from = Vec3.atCenterOf(getBlockPos().above());
+		Vec3 to = Vec3.atCenterOf(receiver.getBlockPos().above());
+		((ServerLevel) level).sendParticles(new BeamParticleOptions(from, to, duration), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
 	}
 
 	@Override
@@ -324,65 +395,76 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 
 	@Override
 	public boolean isEmpty() {
-		return items.get(0).isEmpty() && items.get(1).isEmpty();
+		return item.isEmpty() && pendingItem.isEmpty();
 	}
 
 	@Override
 	public ItemStack getItem(int slot) {
-		return items.get(slot);
+		return slot == TEMPLATE_SLOT ? item : ItemStack.EMPTY;
 	}
 
 	@Override
 	public ItemStack removeItem(int slot, int count) {
-		ItemStack stack = items.get(slot);
-		if (stack.isEmpty()) {
+		if (slot != TEMPLATE_SLOT || item.isEmpty()) {
 			return ItemStack.EMPTY;
 		}
 		ItemStack result;
-		if (stack.getCount() <= count) {
-			result = stack;
-			items.set(slot, ItemStack.EMPTY);
+		if (item.getCount() <= count) {
+			result = item;
+			item = ItemStack.EMPTY;
 		} else {
-			result = stack.copyWithCount(count);
-			stack.shrink(count);
+			result = item.copyWithCount(count);
+			item.shrink(count);
 		}
-		if (slot == TEMPLATE_SLOT) {
-			templateDirty = true;
-		}
-		setChanged();
+		templateDirty = true;
+		refresh();
 		return result;
 	}
 
 	@Override
 	public ItemStack removeItemNoUpdate(int slot) {
-		ItemStack stack = items.get(slot);
-		items.set(slot, ItemStack.EMPTY);
-		if (slot == TEMPLATE_SLOT) {
-			templateDirty = true;
+		if (slot != TEMPLATE_SLOT) {
+			return ItemStack.EMPTY;
 		}
-		return stack;
+		ItemStack result = item;
+		item = ItemStack.EMPTY;
+		templateDirty = true;
+		refresh();
+		return result;
 	}
 
 	@Override
-	public void setItem(int slot, ItemStack stack) {
-		items.set(slot, stack);
-		if (slot == TEMPLATE_SLOT) {
-			templateDirty = true;
+	public void setItem(int slot, ItemStack itemStack) {
+		if (slot == MATERIAL_SLOT) {
+			if (!itemStack.isEmpty()) {
+				insertMaterial(ItemVariant.of(itemStack), itemStack.getCount());
+			}
+			return;
 		}
-		setChanged();
+		if (!pendingItem.isEmpty()) {
+			return;
+		}
+		this.item = itemStack;
+		templateDirty = true;
+		refresh();
 	}
 
 	@Override
 	public void clearContent() {
-		items.set(0, ItemStack.EMPTY);
-		items.set(1, ItemStack.EMPTY);
+		item = ItemStack.EMPTY;
 		templateDirty = true;
-		setChanged();
+		refresh();
 	}
 
 	@Override
-	public boolean canPlaceItem(int slot, ItemStack stack) {
-		return slot == TEMPLATE_SLOT && isTemplateStack(stack);
+	public boolean canPlaceItem(int slot, ItemStack itemStack) {
+		if (slot == TEMPLATE_SLOT) {
+			return pendingItem.isEmpty();
+		}
+		if (slot == MATERIAL_SLOT) {
+			return requiredAmount(ItemVariant.of(itemStack)) > 0;
+		}
+		return false;
 	}
 
 	@Override
@@ -393,8 +475,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	@Override
 	protected void saveAdditional(ValueOutput output) {
 		super.saveAdditional(output);
-		output.store("template", ItemStack.OPTIONAL_CODEC, items.get(TEMPLATE_SLOT));
-		output.store("output", ItemStack.OPTIONAL_CODEC, items.get(OUTPUT_SLOT));
+		output.store("template", ItemStack.OPTIONAL_CODEC, item);
 		output.putLong("energy", energy);
 		output.putInt("progress", progress);
 		List<SimulationResult.Material> storedMaterials = new ArrayList<>();
@@ -402,27 +483,43 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 			storedMaterials.add(new SimulationResult.Material(entry.getKey(), (int) entry.getLongValue()));
 		}
 		output.store("materials", SimulationResult.Material.CODEC.listOf(), storedMaterials);
+		output.store("pendingItem", ItemStack.OPTIONAL_CODEC, pendingItem);
+		output.putInt("pendingTicks", pendingTicks);
 	}
 
 	@Override
 	protected void loadAdditional(ValueInput input) {
 		super.loadAdditional(input);
-		items.set(TEMPLATE_SLOT, input.read("template", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY));
-		items.set(OUTPUT_SLOT, input.read("output", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY));
+		item = input.read("template", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
 		energy = input.getLongOr("energy", 0);
-		progress = input.getIntOr("progress", 0);
+		int savedProgress = input.getIntOr("progress", 0);
 		for (SimulationResult.Material material : input.read("materials", SimulationResult.Material.CODEC.listOf()).orElse(List.of())) {
 			materials.put(material.item(), material.count());
 		}
-		templateDirty = true;
+		templateDirty = false;
+		resolveTemplate();
+		progress = errorCode == ERROR_NONE ? savedProgress : 0;
+		pendingItem = input.read("pendingItem", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+		pendingTicks = input.getIntOr("pendingTicks", 0);
+		shakeTime = input.getLongOr("shakeTime", -1);
+		progressTime = input.getLongOr("progressTime", -1);
 	}
 
 	@Override
 	protected void readPacketData(ValueInput valueInput) {
+		item = valueInput.read("template", ItemStack.OPTIONAL_CODEC).orElse(ItemStack.EMPTY);
+		progress = valueInput.getIntOr("progress", 0);
+		shakeTime = valueInput.getLongOr("shakeTime", -1);
+		progressTime = valueInput.getLongOr("progressTime", -1);
+		templateDirty = true;
 	}
 
 	@Override
 	protected void writePacketData(ValueOutput valueOutput) {
+		valueOutput.store("template", ItemStack.OPTIONAL_CODEC, item);
+		valueOutput.putInt("progress", progress);
+		valueOutput.putLong("shakeTime", shakeTime);
+		valueOutput.putLong("progressTime", progressTime);
 	}
 
 	private final class FactoryItemStorage implements Storage<ItemVariant> {
@@ -436,64 +533,40 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 				return materialMoved;
 			}
 			ItemStack incoming = resource.toStack(1);
-			if (!canPlaceItem(TEMPLATE_SLOT, incoming)) {
+			if (!canPlaceItem(TEMPLATE_SLOT, incoming) || !item.isEmpty() || !pendingItem.isEmpty()) {
 				return 0;
 			}
-			ItemStack existing = items.get(TEMPLATE_SLOT);
-			long space;
-			if (existing.isEmpty()) {
-				space = Math.min(maxAmount, incoming.getMaxStackSize());
-			} else if (ItemStack.isSameItemSameComponents(existing, incoming)) {
-				space = Math.min(maxAmount, existing.getMaxStackSize() - existing.getCount());
-			} else {
-				return 0;
-			}
-			if (space <= 0) {
-				return 0;
-			}
-			if (existing.isEmpty()) {
-				items.set(TEMPLATE_SLOT, incoming.copyWithCount((int) space));
-			} else {
-				existing.grow((int) space);
-			}
+			item = incoming;
 			templateDirty = true;
-			setChanged();
-			return space;
+			refresh();
+			return 1;
 		}
 
 		@Override
 		public long extract(ItemVariant resource, long maxAmount, TransactionContext transaction) {
-			ItemStack output = items.get(OUTPUT_SLOT);
-			if (output.isEmpty() || !ItemVariant.of(output).equals(resource)) {
+			if (item.isEmpty() || !ItemVariant.of(item).equals(resource)) {
 				return 0;
 			}
-			long moved = Math.min(maxAmount, output.getCount());
+			long moved = Math.min(maxAmount, item.getCount());
 			if (moved <= 0) {
 				return 0;
 			}
-			output.shrink((int) moved);
-			if (output.isEmpty()) {
-				items.set(OUTPUT_SLOT, ItemStack.EMPTY);
+			item.shrink((int) moved);
+			if (item.isEmpty()) {
+				item = ItemStack.EMPTY;
 			}
-			setChanged();
+			templateDirty = true;
+			refresh();
 			return moved;
 		}
 
 		@Override
 		public Iterator<StorageView<ItemVariant>> iterator() {
 			List<StorageView<ItemVariant>> views = new ArrayList<>();
-			for (int slot = 0; slot < items.size(); slot++) {
-				ItemStack stack = items.get(slot);
-				if (stack.isEmpty()) {
-					continue;
-				}
-				int index = slot;
+			if (!item.isEmpty()) {
 				views.add(new StorageView<>() {
 					@Override
 					public long extract(ItemVariant resource, long maxAmount, TransactionContext transaction) {
-						if (index == TEMPLATE_SLOT) {
-							return 0;
-						}
 						return FactoryItemStorage.this.extract(resource, maxAmount, transaction);
 					}
 
@@ -504,17 +577,17 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 
 					@Override
 					public ItemVariant getResource() {
-						return ItemVariant.of(stack);
+						return ItemVariant.of(item);
 					}
 
 					@Override
 					public long getAmount() {
-						return stack.getCount();
+						return item.getCount();
 					}
 
 					@Override
 					public long getCapacity() {
-						return stack.getMaxStackSize();
+						return 1;
 					}
 				});
 			}

@@ -62,13 +62,16 @@ public final class SpaceFoldConfig {
 	@KiwiConfig.Path("carver.durationTicks")
 	public static int factoryDurationTicks = 100;
 
-	@KiwiConfig.Path("carver.energyPerCraft")
-	public static int factoryEnergyPerCraft = 1000;
-
-	@KiwiConfig.Path("carver.outputPerCraft")
-	public static int factoryOutputPerCraft = 1;
+	@KiwiConfig.Path("carver.energyPerTick")
+	public static int factoryEnergyPerTick = 10;
 
 	@KiwiConfig.Path("carver.energyBuffer")
 	public static int factoryEnergyBuffer = 100000;
+
+	@KiwiConfig.Path("carver.shakeAmplitude")
+	public static double factoryShakeAmplitude = 0.04;
+
+	@KiwiConfig.Path("carver.shakeLargeAmplitude")
+	public static double factoryShakeLargeAmplitude = 0.2;
 
 }

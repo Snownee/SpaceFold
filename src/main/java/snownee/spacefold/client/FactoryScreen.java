@@ -30,6 +30,8 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 			case FactoryBlockEntity.ERROR_ROOM_SIDE -> "tip.spacefold.factory_room_side";
 			case FactoryBlockEntity.ERROR_NO_RESULT -> "tip.spacefold.factory_no_result";
 			case FactoryBlockEntity.ERROR_FAILED -> "tip.spacefold.factory_failed";
+			case FactoryBlockEntity.ERROR_NO_RECEIVER -> "tip.spacefold.factory_no_receiver";
+			case FactoryBlockEntity.ERROR_OBSTRUCTED -> "tip.spacefold.factory_obstructed";
 			default -> "tip.spacefold.factory_invalid";
 		};
 	}

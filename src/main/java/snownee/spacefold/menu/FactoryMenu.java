@@ -39,8 +39,7 @@ public class FactoryMenu extends AbstractContainerMenu {
 		super(CoreModule.FACTORY_MENU.get(), containerId);
 		this.container = container;
 		this.data = data;
-		addSlot(new FactorySlot(container, FactoryBlockEntity.TEMPLATE_SLOT, 48, 35, true));
-		addSlot(new FactorySlot(container, FactoryBlockEntity.OUTPUT_SLOT, 124, 35, false));
+		addSlot(new FactorySlot(container, FactoryBlockEntity.TEMPLATE_SLOT, 48, 35, 1));
 		addStandardInventorySlots(inventory, 8, 84);
 		addDataSlots(data);
 	}
@@ -74,8 +73,8 @@ public class FactoryMenu extends AbstractContainerMenu {
 		}
 		ItemStack stack = slot.getItem();
 		ItemStack copy = stack.copy();
-		if (index < 2) {
-			if (!moveItemStackTo(stack, 2, slots.size(), true)) {
+		if (index < 1) {
+			if (!moveItemStackTo(stack, 1, slots.size(), true)) {
 				return ItemStack.EMPTY;
 			}
 		} else {

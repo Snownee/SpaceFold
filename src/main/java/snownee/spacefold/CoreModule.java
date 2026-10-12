@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.mojang.serialization.Codec;
 
+import net.fabricmc.fabric.api.object.builder.v1.world.poi.PoiHelper;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.minecraft.core.Direction;
@@ -11,8 +12,10 @@ import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.tags.TagKey;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
@@ -25,6 +28,7 @@ import snownee.kiwi.BlockObject;
 import snownee.kiwi.ItemObject;
 import snownee.kiwi.KiwiGO;
 import snownee.kiwi.KiwiModule;
+import snownee.kiwi.loader.Platform;
 import snownee.kiwi.loader.event.InitEvent;
 import snownee.spacefold.block.ChamberWallBlock;
 import snownee.spacefold.block.FactoryBlock;
@@ -42,9 +46,12 @@ import snownee.spacefold.menu.RepeaterMenu;
 import snownee.spacefold.menu.SimulatorMenu;
 import snownee.spacefold.paint.FacePaint;
 import snownee.spacefold.paint.RepeaterPaints;
+import snownee.spacefold.particle.BeamParticleOptions;
+import snownee.spacefold.particle.BeamParticleType;
 import snownee.spacefold.particle.CubeParticleOptions;
 import snownee.spacefold.particle.CubeParticleType;
 import snownee.spacefold.recipe.SimulationSlotDisplay;
+import snownee.spacefold.util.ClientProxy;
 import team.reborn.energy.api.EnergyStorage;
 
 @KiwiModule(modId = SpaceFold.ID)
@@ -53,6 +60,9 @@ public final class CoreModule extends AbstractModule {
 	public static final TagKey<Block> ROOM_INVALID = blockTag("room_invalid");
 	public static final TagKey<Block> ROOM_IGNORED = blockTag("room_ignored");
 	public static final TagKey<Block> CHAMBER_WINDOWS = blockTag("chamber_windows");
+	public static final ResourceKey<PoiType> FACTORY_POI = ResourceKey.create(
+			Registries.POINT_OF_INTEREST_TYPE,
+			Identifier.fromNamespaceAndPath(SpaceFold.ID, "factory"));
 
 	public static final BlockObject<ChamberWallBlock> CHAMBER_WALL = block(ChamberWallBlock::new);
 	public static final BlockObject<ChamberWallBlock> CHAMBER_WINDOW = block(ChamberWallBlock::new);
@@ -102,6 +112,8 @@ public final class CoreModule extends AbstractModule {
 			Registries.DATA_COMPONENT_TYPE);
 	@KiwiModule.Name("cube")
 	public static final KiwiGO<ParticleType<CubeParticleOptions>> CUBE = go(CubeParticleType::new, Registries.PARTICLE_TYPE);
+	@KiwiModule.Name("beam")
+	public static final KiwiGO<ParticleType<BeamParticleOptions>> BEAM = go(BeamParticleType::new, Registries.PARTICLE_TYPE);
 	@KiwiModule.Name("main")
 	public static final KiwiGO<CreativeModeTab> TAB = go(() -> itemCategory(
 			Identifier.fromNamespaceAndPath(SpaceFold.ID, "main"),
@@ -110,6 +122,14 @@ public final class CoreModule extends AbstractModule {
 	public static final KiwiGO<SlotDisplay.Type<SimulationSlotDisplay>> SIMULATION_DISPLAY = go(
 			() -> SimulationSlotDisplay.TYPE,
 			Registries.SLOT_DISPLAY);
+
+	@Override
+	protected void addEntries() {
+		PoiHelper.register(FACTORY_POI.identifier(), 0, 1, FACTORY.getOrCreate());
+		if (Platform.isPhysicalClient()) {
+			ClientProxy.registerFactoryRenderer();
+		}
+	}
 
 	@Override
 	protected void init(InitEvent event) {

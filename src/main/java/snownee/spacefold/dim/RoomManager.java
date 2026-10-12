@@ -66,7 +66,10 @@ public final class RoomManager {
 	}
 
 	public static void useSimulator(ServerLevel level, ServerPlayer player, BlockPos pos, boolean windows) {
-		SimulatorBlockEntity blockEntity = (SimulatorBlockEntity) Objects.requireNonNull(level.getBlockEntity(pos));
+		if (!(level.getBlockEntity(pos) instanceof SimulatorBlockEntity blockEntity)) {
+			player.sendOverlayMessage(Component.translatable("tip.spacefold.link_broken"));
+			return;
+		}
 		int room = blockEntity.getRoomIndex();
 		if (isRoomDimension(level.dimension())) {
 			GlobalPos sourceRef = room < 0 ? null : source(level, room);
@@ -355,7 +358,7 @@ public final class RoomManager {
 				RoomManager.setPreviewSnapshot(level, room, RoomManager.captureSnapshot(level, room));
 				result = SimulationResult.previewOnly(RoomSnapshot.previewId(room));
 			} else if (RoomManager.previewSnapshot(level, room) != null) {
-			 	result = SimulationResult.previewOnly(RoomSnapshot.previewId(room));
+				result = SimulationResult.previewOnly(RoomSnapshot.previewId(room));
 			}
 		}
 		return result;
