@@ -40,6 +40,7 @@ import net.minecraft.world.level.block.CandleBlock;
 import net.minecraft.world.level.block.SeaPickleBlock;
 import net.minecraft.world.level.block.SnowLayerBlock;
 import net.minecraft.world.level.block.TurtleEggBlock;
+import net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.SlabType;
@@ -66,11 +67,40 @@ public final class SimulationManager {
 
 	private static final Map<Integer, Session> ACTIVE = new HashMap<>();
 
+	private static long serverTicks;
+	private static long simTime;
+	private static long copyTriggerOffset;
+
 	private SimulationManager() {
 	}
 
 	public static void init() {
 		ServerTickEvents.END_SERVER_TICK.register(SimulationManager::onServerTick);
+	}
+
+	public static long gameTime() {
+		return simTime;
+	}
+
+	public static void advanceGameTime() {
+		simTime++;
+	}
+
+	public static long copyTriggerOffset() {
+		return copyTriggerOffset;
+	}
+
+	public static void withCopyTriggerOffset(long offset, Runnable action) {
+		copyTriggerOffset = offset;
+		try {
+			action.run();
+		} finally {
+			copyTriggerOffset = 0;
+		}
+	}
+
+	private static int tickMultiplier() {
+		return Math.max(1, SpaceFoldConfig.simulationTickMultiplier);
 	}
 
 	public static RoomStatus roomStatus(ServerLevel level, int room) {
@@ -97,7 +127,7 @@ public final class SimulationManager {
 				simulate,
 				room,
 				startTime,
-				startTime + SpaceFoldConfig.simulationDuration * 20L,
+				startTime + SpaceFoldConfig.simulationDuration * 20L * tickMultiplier(),
 				materials(simulate, room),
 				RoomManager.captureSnapshot(simulate, room),
 				sourceDim,
@@ -221,9 +251,9 @@ public final class SimulationManager {
 	private static BlockPos[] collectInterfaces(ServerLevel simulate, int room) {
 		BlockPos origin = RoomManager.roomOrigin(room);
 		BlockPos[] targets = new BlockPos[6];
-		for (int dx = 0; dx < Plan.ROOM_SIZE; dx++) {
-			for (int dy = 0; dy < Plan.ROOM_SIZE; dy++) {
-				for (int dz = 0; dz < Plan.ROOM_SIZE; dz++) {
+		for (int dx = 0; dx < SpaceFoldConfig.roomSize; dx++) {
+			for (int dy = 0; dy < SpaceFoldConfig.roomSize; dy++) {
+				for (int dz = 0; dz < SpaceFoldConfig.roomSize; dz++) {
 					BlockPos at = origin.offset(dx, dy, dz);
 					BlockState state = simulate.getBlockState(at);
 					if (state.getBlock() instanceof InterfaceBlock) {
@@ -252,7 +282,8 @@ public final class SimulationManager {
 				end(server, simulate, entry.getKey(), entry.getValue());
 			}
 		}
-		if (now % UPDATE_INTERVAL == 0) {
+		serverTicks++;
+		if (serverTicks % UPDATE_INTERVAL == 0) {
 			broadcast(server, simulate, now);
 		}
 	}
@@ -309,7 +340,8 @@ public final class SimulationManager {
 		double countedDuration = (total - warmupTickCount) / 20.0;
 		double p = countedDuration <= 0 ? 1.0 : Math.min(1.0, countedElapsed / countedDuration);
 		Warmup warmup = session.warmup();
-		return new SSimulationRatesPacket(progress,
+		return new SSimulationRatesPacket(
+				progress,
 				blend(warmup.inputs, session.inputs(), countedElapsed, p),
 				blend(warmup.outputs, session.outputs(), countedElapsed, p));
 	}
@@ -318,7 +350,7 @@ public final class SimulationManager {
 		if (elapsed <= 0) {
 			return Section.EMPTY;
 		}
-		double divisor = rateSeconds(elapsed);
+		double divisor = elapsed;
 		Map<ItemVariant, Double> items = new LinkedHashMap<>();
 		for (Object2LongMap.Entry<ItemVariant> entry : resources.items.object2LongEntrySet()) {
 			items.put(entry.getKey(), entry.getLongValue() / divisor);
@@ -331,7 +363,7 @@ public final class SimulationManager {
 	}
 
 	private static Section blend(SimulationResult.Rates warmup, Resources resources, double elapsed, double p) {
-		double divisor = rateSeconds(elapsed);
+		double divisor = elapsed;
 		Map<ItemVariant, Double> items = new LinkedHashMap<>();
 		for (Map.Entry<ItemVariant, Double> entry : warmup.items().entrySet()) {
 			items.merge(entry.getKey(), entry.getValue() * (1.0 - p), Double::sum);
@@ -374,7 +406,8 @@ public final class SimulationManager {
 
 	private static void end(MinecraftServer server, ServerLevel simulate, int room, Session session) {
 		setChunksLoaded(server, session, false);
-		boolean blocksChanged = !materials(simulate, room).equals(session.materials());
+		List<SimulationResult.Material> currentMaterials = materials(simulate, room);
+		boolean blocksChanged = !currentMaterials.equals(session.materials());
 		SimulationResult simulationResult = result(session, blocksChanged, tier(simulate, room));
 		if (!simulationResult.failed()) {
 			int snapshotId = RoomManager.allocateSnapshot(simulate, session.snapshot());
@@ -395,7 +428,36 @@ public final class SimulationManager {
 				player.sendOverlayMessage(Component.translatable(key));
 			}
 		}
+		if (blocksChanged && SpaceFoldConfig.debug) {
+			for (Component line : materialChanges(session.materials(), currentMaterials)) {
+				for (ServerPlayer player : players) {
+					player.sendSystemMessage(line);
+				}
+			}
+		}
 		clearRoom(simulate, room, RoomManager.roomOrigin(room));
+	}
+
+	private static List<Component> materialChanges(List<SimulationResult.Material> before, List<SimulationResult.Material> after) {
+		Map<ItemVariant, Integer> deltas = new LinkedHashMap<>();
+		for (SimulationResult.Material material : before) {
+			deltas.merge(material.item(), -material.count(), Integer::sum);
+		}
+		for (SimulationResult.Material material : after) {
+			deltas.merge(material.item(), material.count(), Integer::sum);
+		}
+		List<Component> lines = new ArrayList<>();
+		for (Map.Entry<ItemVariant, Integer> entry : deltas.entrySet()) {
+			int delta = entry.getValue();
+			if (delta != 0) {
+				String amount = (delta > 0 ? "+" : "") + delta;
+				lines.add(Component.translatable(
+						"tip.spacefold.material_changed",
+						entry.getKey().toStack().getHoverName(),
+						amount));
+			}
+		}
+		return lines;
 	}
 
 	private static SimulationResult result(Session session, boolean blocksChanged, int tier) {
@@ -456,28 +518,31 @@ public final class SimulationManager {
 		if (!sufficient && outputs.energy() >= SpaceFoldConfig.simulationMinEnergyOutputRate) {
 			sufficient = true;
 		}
-		boolean failed = blocksChanged || noOutput || !sufficient || tooManyTypes;
-		Optional<String> failure = Optional.empty();
-		if (failed) {
-			if (blocksChanged) {
-				failure = Optional.of("tip.spacefold.simulation_failed");
-			} else if (tooManyTypes) {
-				failure = Optional.of("tip.spacefold.simulation_too_many_types");
-			} else if (noOutput) {
-				failure = Optional.of("tip.spacefold.simulation_no_output");
-			} else {
-				failure = Optional.of("tip.spacefold.simulation_low_output");
-			}
+		String failure = null;
+		if (blocksChanged) {
+			failure = "tip.spacefold.simulation_blocks_changed";
+		} else if (tooManyTypes) {
+			failure = "tip.spacefold.simulation_too_many_types";
+		} else if (noOutput) {
+			failure = "tip.spacefold.simulation_no_output";
+		} else if (!sufficient) {
+			failure = "tip.spacefold.simulation_low_output";
 		}
-		return new SimulationResult(rawInputs, rawOutputs, session.materials(), failed, failure, tier);
+		return new SimulationResult(
+				rawInputs,
+				rawOutputs,
+				session.materials(),
+				Optional.ofNullable(failure),
+				tier,
+				RoomSnapshot.previewId(session.room));
 	}
 
 	private static int tier(ServerLevel level, int room) {
 		BlockPos origin = RoomManager.roomOrigin(room);
 		int max = 0;
-		for (int dx = 1; dx < Plan.ROOM_SIZE - 1; dx++) {
-			for (int dy = 1; dy < Plan.ROOM_SIZE - 1; dy++) {
-				for (int dz = 1; dz < Plan.ROOM_SIZE - 1; dz++) {
+		for (int dx = 1; dx < SpaceFoldConfig.roomSize - 1; dx++) {
+			for (int dy = 1; dy < SpaceFoldConfig.roomSize - 1; dy++) {
+				for (int dz = 1; dz < SpaceFoldConfig.roomSize - 1; dz++) {
 					if (level.getBlockEntity(origin.offset(dx, dy, dz)) instanceof RepeaterBlockEntity repeater) {
 						SimulationResult result = repeater.getResult();
 						if (result != null) {
@@ -493,11 +558,11 @@ public final class SimulationManager {
 	static List<SimulationResult.Material> materials(ServerLevel level, int room) {
 		BlockPos origin = RoomManager.roomOrigin(room);
 		Map<ItemVariant, Integer> counts = new LinkedHashMap<>();
-		for (int dx = 1; dx < Plan.ROOM_SIZE - 1; dx++) {
-			for (int dy = 1; dy < Plan.ROOM_SIZE - 1; dy++) {
-				for (int dz = 1; dz < Plan.ROOM_SIZE - 1; dz++) {
+		for (int dx = 1; dx < SpaceFoldConfig.roomSize - 1; dx++) {
+			for (int dy = 1; dy < SpaceFoldConfig.roomSize - 1; dy++) {
+				for (int dz = 1; dz < SpaceFoldConfig.roomSize - 1; dz++) {
 					BlockPos at = origin.offset(dx, dy, dz);
-					collectMaterial(level, at, level.getBlockState(at), counts);
+					collectMaterial(level, at, materialState(level, at), counts);
 				}
 			}
 		}
@@ -507,6 +572,14 @@ public final class SimulationManager {
 		}
 		materials.sort(Comparator.comparing(material -> BuiltInRegistries.ITEM.getKey(material.item().getItem()).toString()));
 		return materials;
+	}
+
+	private static BlockState materialState(ServerLevel level, BlockPos pos) {
+		BlockState state = level.getBlockState(pos);
+		if (state.is(Blocks.MOVING_PISTON) && level.getBlockEntity(pos) instanceof PistonMovingBlockEntity moving) {
+			return moving.getMovedState();
+		}
+		return state;
 	}
 
 	private static void collectMaterial(ServerLevel level, BlockPos pos, BlockState state, Map<ItemVariant, Integer> counts) {
@@ -551,12 +624,8 @@ public final class SimulationManager {
 		return 1;
 	}
 
-	private static double rateSeconds(double seconds) {
-		return seconds * Math.max(1, SpaceFoldConfig.simulationTickMultiplier);
-	}
-
 	private static SimulationResult.Rates rateSet(Resources resources, double seconds) {
-		double divisor = rateSeconds(seconds);
+		double divisor = seconds;
 		Map<ItemVariant, Double> items = new LinkedHashMap<>();
 		for (Object2LongMap.Entry<ItemVariant> entry : resources.items.object2LongEntrySet()) {
 			items.put(entry.getKey(), entry.getLongValue() / divisor);
@@ -573,25 +642,23 @@ public final class SimulationManager {
 				origin.getX(),
 				origin.getY(),
 				origin.getZ(),
-				origin.getX() + Plan.ROOM_SIZE,
-				origin.getY() + Plan.ROOM_SIZE,
-				origin.getZ() + Plan.ROOM_SIZE);
+				origin.getX() + SpaceFoldConfig.roomSize,
+				origin.getY() + SpaceFoldConfig.roomSize,
+				origin.getZ() + SpaceFoldConfig.roomSize);
 		for (Entity entity : simulate.getEntitiesOfClass(Entity.class, bounds)) {
 			if (!(entity instanceof ServerPlayer)) {
 				entity.discard();
 			}
 		}
-		RoomProtection.runInternal(() -> {
-			BlockState air = Blocks.AIR.defaultBlockState();
-			int flags = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
-			for (int dx = 0; dx < Plan.ROOM_SIZE; dx++) {
-				for (int dy = 0; dy < Plan.ROOM_SIZE; dy++) {
-					for (int dz = 0; dz < Plan.ROOM_SIZE; dz++) {
-						simulate.setBlock(origin.offset(dx, dy, dz), air, flags);
-					}
+		BlockState air = Blocks.AIR.defaultBlockState();
+		int flags = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
+		for (int dx = 0; dx < SpaceFoldConfig.roomSize; dx++) {
+			for (int dy = 0; dy < SpaceFoldConfig.roomSize; dy++) {
+				for (int dz = 0; dz < SpaceFoldConfig.roomSize; dz++) {
+					simulate.setBlock(origin.offset(dx, dy, dz), air, flags);
 				}
 			}
-		});
+		}
 	}
 
 	private static void setChunksLoaded(MinecraftServer server, Session session, boolean loaded) {

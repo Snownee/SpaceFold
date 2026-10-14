@@ -8,6 +8,11 @@ public final class SpaceFoldConfig {
 	@KiwiConfig.Path("debug.enable")
 	public static boolean debug;
 
+	@KiwiConfig.Path("room.size")
+	@KiwiConfig.Range(min = 3, max = 16)
+	@KiwiConfig.GameRestart
+	public static int roomSize = 11;
+
 	@KiwiConfig.Path("containment.placement")
 	public static boolean placementEnabled = true;
 
@@ -27,7 +32,7 @@ public final class SpaceFoldConfig {
 	public static int simulationTickMultiplier = 20;
 
 	@KiwiConfig.Path("trial.minItemOutputRate")
-	public static double simulationMinItemOutputRate = 5.0;
+	public static double simulationMinItemOutputRate = 2.0;
 
 	@KiwiConfig.Path("trial.minFluidOutputRate")
 	public static double simulationMinFluidOutputRate = 8100.0;

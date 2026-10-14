@@ -3,13 +3,13 @@
   "category": "misc",
   "key": {
     "E": "minecraft:ender_eye",
-    "M": "spacefold:chamber_wall",
+    "I": "minecraft:iron_ingot",
     "O": "minecraft:crying_obsidian"
   },
   "pattern": [
-    "MOM",
-    "OEO",
-    "MOM"
+    "OOO",
+    "IEI",
+    "OOO"
   ],
   "result": {
     "id": "spacefold:simulator"

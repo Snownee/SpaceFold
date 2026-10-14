@@ -12,9 +12,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.util.ProblemReporter;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
@@ -24,14 +26,15 @@ import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.EntityBlock;
 import net.minecraft.world.level.block.HorizontalDirectionalBlock;
+import net.minecraft.world.level.block.RespawnAnchorBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.storage.TagValueOutput;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
@@ -39,19 +42,21 @@ import net.minecraft.world.phys.BlockHitResult;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.block.entity.SimulatorBlockEntity;
 import snownee.spacefold.dim.RoomManager;
+import snownee.spacefold.dim.Simulate;
 import snownee.spacefold.dim.SimulationResult;
 import snownee.spacefold.menu.SimulatorMenu;
 
 public class SimulatorBlock extends HorizontalDirectionalBlock implements EntityBlock {
 	public static final MapCodec<SimulatorBlock> CODEC = simpleCodec(SimulatorBlock::new);
+	private static final BlockState RESPAWN_ANCHOR = Blocks.RESPAWN_ANCHOR.defaultBlockState().setValue(RespawnAnchorBlock.CHARGE, 4);
 
 	public SimulatorBlock(BlockBehaviour.Properties properties) {
-		super(properties.mapColor(MapColor.COLOR_PURPLE).strength(1.5F));
+		super(properties.strength(1.5F));
 	}
 
 	private static @Nullable Component placementError(ItemStack stack, Level level, BlockPos pos) {
 		boolean roomSide = stack.getOrDefault(CoreModule.ROOM_SIDE.get(), false);
-		boolean inRoom = RoomManager.isRoomDimension(level.dimension());
+		boolean inRoom = RoomManager.isRoomDimension(level);
 		if (roomSide != inRoom) {
 			return Component.translatable("tip.spacefold.simulator_wrong_side");
 		}
@@ -81,7 +86,7 @@ public class SimulatorBlock extends HorizontalDirectionalBlock implements Entity
 		if (name != null) {
 			stack.set(DataComponents.CUSTOM_NAME, name);
 		}
-		stack.set(CoreModule.ROOM_SIDE.get(), RoomManager.isRoomDimension(level.dimension()));
+		stack.set(CoreModule.ROOM_SIDE.get(), RoomManager.isRoomDimension(level));
 		attachResult(level, blockEntity, stack);
 	}
 
@@ -103,6 +108,25 @@ public class SimulatorBlock extends HorizontalDirectionalBlock implements Entity
 	@Override
 	public BlockEntity newBlockEntity(BlockPos worldPosition, BlockState blockState) {
 		return new SimulatorBlockEntity(worldPosition, blockState);
+	}
+
+	@Override
+	public void stepOn(Level level, BlockPos pos, BlockState onState, Entity entity) {
+		if (level.isClientSide() || level.dimension().equals(Simulate.DIMENSION)) {
+			return;
+		}
+		if (!(entity instanceof LivingEntity) || !entity.canUsePortal(false)) {
+			return;
+		}
+		if (entity.isOnPortalCooldown()) {
+			if (entity.getPortalCooldown() < RoomManager.TELEPORT_COOLDOWN) {
+				entity.setPortalCooldown(RoomManager.TELEPORT_COOLDOWN);
+			}
+			return;
+		}
+		if (level.getBlockEntity(pos) instanceof SimulatorBlockEntity blockEntity) {
+			blockEntity.onStepped((ServerLevel) level, entity);
+		}
 	}
 
 	@Override
@@ -145,7 +169,7 @@ public class SimulatorBlock extends HorizontalDirectionalBlock implements Entity
 		ItemStack stack = super.getCloneItemStack(level, pos, state, includeData);
 		if (level instanceof Level realLevel && realLevel.getBlockEntity(pos) instanceof SimulatorBlockEntity blockEntity &&
 				blockEntity.getRoomIndex() >= 0) {
-			stack.set(CoreModule.ROOM_SIDE.get(), RoomManager.isRoomDimension(realLevel.dimension()));
+			stack.set(CoreModule.ROOM_SIDE.get(), RoomManager.isRoomDimension(realLevel));
 			attachResult(realLevel, blockEntity, stack);
 		}
 		return stack;
@@ -177,12 +201,17 @@ public class SimulatorBlock extends HorizontalDirectionalBlock implements Entity
 	@Override
 	public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
 		super.setPlacedBy(level, pos, state, placer, stack);
-		if (level.isClientSide() || RoomManager.isRoomDimension(level.dimension())) {
+		if (level.isClientSide() || RoomManager.isRoomDimension(level)) {
 			return;
 		}
 		if (!(level.getBlockEntity(pos) instanceof SimulatorBlockEntity blockEntity) || blockEntity.getRoomIndex() < 0) {
 			return;
 		}
 		RoomManager.setSource((ServerLevel) level, blockEntity.getRoomIndex(), pos, level.dimension());
+	}
+
+	@Override
+	public void animateTick(BlockState state, Level level, BlockPos pos, RandomSource random) {
+		Blocks.RESPAWN_ANCHOR.animateTick(RESPAWN_ANCHOR, level, pos, random);
 	}
 }

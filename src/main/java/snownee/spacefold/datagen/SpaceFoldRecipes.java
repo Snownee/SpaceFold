@@ -23,43 +23,31 @@ public class SpaceFoldRecipes extends FabricRecipeProvider {
 			@Override
 			public void buildRecipes() {
 				shaped(RecipeCategory.TOOLS, CoreModule.OPENER.get())
-						.define('E', Items.ENDER_PEARL)
 						.define('A', Items.AMETHYST_SHARD)
-						.define('I', Items.IRON_INGOT)
-						.pattern("  A")
-						.pattern(" E ")
-						.pattern("I  ")
-						.unlockedBy("has_amethyst_shard", has(Items.AMETHYST_SHARD))
+						.define('E', Items.END_ROD)
+						.pattern("A")
+						.pattern("E")
+						.unlockedBy("has_item", has(CoreModule.SIMULATOR.get()))
 						.save(output);
 
 				shaped(RecipeCategory.MISC, CoreModule.SIMULATOR.get())
 						.define('O', Blocks.CRYING_OBSIDIAN)
 						.define('E', Items.ENDER_EYE)
-						.define('M', CoreModule.CHAMBER_WALL.get())
-						.pattern("MOM")
-						.pattern("OEO")
-						.pattern("MOM")
-						.unlockedBy("has_ender_eye", has(Items.ENDER_EYE))
-						.save(output);
-
-				shaped(RecipeCategory.MISC, CoreModule.REPEATER.get())
-						.define('S', CoreModule.SIMULATOR.get())
-						.define('A', Items.AMETHYST_BLOCK)
-						.define('D', Items.DIAMOND)
-						.pattern("DAD")
-						.pattern("ASA")
-						.pattern("DAD")
-						.unlockedBy("has_spacetime_anchor", has(CoreModule.SIMULATOR.get()))
+						.define('I', Items.IRON_INGOT)
+						.pattern("OOO")
+						.pattern("IEI")
+						.pattern("OOO")
+						.unlockedBy("has_item", has(Blocks.CRYING_OBSIDIAN))
 						.save(output);
 
 				shaped(RecipeCategory.MISC, CoreModule.FACTORY.get(), 2)
-						.define('R', CoreModule.REPEATER.get())
+						.define('O', Blocks.CRYING_OBSIDIAN)
 						.define('A', Items.AMETHYST_SHARD)
 						.define('I', Items.IRON_INGOT)
-						.pattern("IAI")
-						.pattern("ARA")
-						.pattern("IAI")
-						.unlockedBy("has_shard_engine", has(CoreModule.REPEATER.get()))
+						.pattern("AOA")
+						.pattern(" I ")
+						.pattern(" O ")
+						.unlockedBy("has_item", has(Blocks.CRYING_OBSIDIAN))
 						.save(output);
 			}
 		};

@@ -4,14 +4,15 @@
   "key": {
     "A": "minecraft:amethyst_shard",
     "I": "minecraft:iron_ingot",
-    "R": "spacefold:repeater"
+    "O": "minecraft:crying_obsidian"
   },
   "pattern": [
-    "IAI",
-    "ARA",
-    "IAI"
+    "AOA",
+    " I ",
+    " O "
   ],
   "result": {
+    "count": 2,
     "id": "spacefold:factory"
   }
 }

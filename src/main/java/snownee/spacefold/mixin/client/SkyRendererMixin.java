@@ -5,6 +5,7 @@ import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
@@ -15,8 +16,7 @@ import net.minecraft.client.renderer.SkyRenderer;
 import net.minecraft.world.level.MoonPhase;
 import snownee.spacefold.client.sky.FogVolume;
 import snownee.spacefold.client.sky.ShootingStars;
-import snownee.spacefold.dim.Plan;
-import snownee.spacefold.dim.Simulate;
+import snownee.spacefold.dim.RoomManager;
 
 @Mixin(SkyRenderer.class)
 public abstract class SkyRendererMixin {
@@ -31,6 +31,13 @@ public abstract class SkyRendererMixin {
 	private void spacefold$hideMoon(MoonPhase moonPhase, float rainBrightness, PoseStack poseStack, CallbackInfo ci) {
 		if (spacefold$isRoomDimension()) {
 			ci.cancel();
+		}
+	}
+
+	@Inject(method = "shouldRenderDarkDisc", at = @At("HEAD"), cancellable = true)
+	private void spacefold$hideDarkDisc(float deltaPartialTick, ClientLevel level, CallbackInfoReturnable<Boolean> cir) {
+		if (RoomManager.isRoomDimension(level)) {
+			cir.setReturnValue(false);
 		}
 	}
 
@@ -58,6 +65,6 @@ public abstract class SkyRendererMixin {
 	@Unique
 	private static boolean spacefold$isRoomDimension() {
 		ClientLevel level = Minecraft.getInstance().level;
-		return level != null && (level.dimension().equals(Plan.DIMENSION) || level.dimension().equals(Simulate.DIMENSION));
+		return level != null && RoomManager.isRoomDimension(level);
 	}
 }

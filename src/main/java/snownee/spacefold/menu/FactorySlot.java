@@ -5,11 +5,8 @@ import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 
 public class FactorySlot extends Slot {
-	private final int maxStackSize;
-
-	public FactorySlot(Container container, int slot, int x, int y, int maxStackSize) {
+	public FactorySlot(Container container, int slot, int x, int y) {
 		super(container, slot, x, y);
-		this.maxStackSize = maxStackSize;
 	}
 
 	@Override
@@ -19,6 +16,6 @@ public class FactorySlot extends Slot {
 
 	@Override
 	public int getMaxStackSize() {
-		return maxStackSize;
+		return 1;
 	}
 }

@@ -3,8 +3,9 @@
 	"id": "spacefold",
 	"version": "${version}",
 	"name": "Space Fold",
-	"description": "Compact a full-scale production line into your personal space shard.\n\nSome textures are from malcolmriley/unused-textures (CC-BY-4.0): https://github.com/malcolmriley/unused-textures",
+	"description": "Compact a full-scale production line into your personal space shard.\n\nSome textures are adapted from textures in TechReborn, licensed under the MIT License: https://github.com/TechReborn/TechReborn",
 	"license": "ARR",
+	"icon": "icon.png",
 	"entrypoints": {
 		"main": [
 			"snownee.spacefold.util.CommonProxy"

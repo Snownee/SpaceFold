@@ -16,7 +16,7 @@ public final class PlanFlight {
 	}
 
 	public static void update(ServerPlayer player) {
-		if (RoomManager.isRoomDimension(player.level().dimension())) {
+		if (RoomManager.isRoomDimension(player.level())) {
 			enable(player);
 		} else if (!player.isCreative() && !player.isSpectator()) {
 			Abilities abilities = player.getAbilities();

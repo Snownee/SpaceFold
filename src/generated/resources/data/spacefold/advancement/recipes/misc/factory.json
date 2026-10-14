@@ -1,11 +1,11 @@
 {
   "parent": "minecraft:recipes/root",
   "criteria": {
-    "has_shard_engine": {
+    "has_item": {
       "conditions": {
         "items": [
           {
-            "items": "spacefold:repeater"
+            "items": "minecraft:crying_obsidian"
           }
         ]
       },
@@ -21,7 +21,7 @@
   "requirements": [
     [
       "has_the_recipe",
-      "has_shard_engine"
+      "has_item"
     ]
   ],
   "rewards": {

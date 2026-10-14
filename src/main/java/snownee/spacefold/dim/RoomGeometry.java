@@ -1,6 +1,7 @@
 package snownee.spacefold.dim;
 
 import net.minecraft.world.phys.Vec3;
+import snownee.spacefold.SpaceFoldConfig;
 
 public final class RoomGeometry {
 	private RoomGeometry() {
@@ -42,7 +43,7 @@ public final class RoomGeometry {
 	}
 
 	public static double maxX(int room) {
-		return Plan.roomOrigin(room).getX() + Plan.ROOM_SIZE - 1 + Plan.ROOM_MARGIN;
+		return Plan.roomOrigin(room).getX() + SpaceFoldConfig.roomSize - 1 + Plan.ROOM_MARGIN;
 	}
 
 	public static double minY(int room) {
@@ -50,7 +51,7 @@ public final class RoomGeometry {
 	}
 
 	public static double maxY(int room) {
-		return Plan.FLOOR_Y + Plan.ROOM_SIZE - 1 + Plan.ROOM_MARGIN;
+		return Plan.FLOOR_Y + SpaceFoldConfig.roomSize - 1 + Plan.ROOM_MARGIN;
 	}
 
 	public static double minZ(int room) {
@@ -58,7 +59,7 @@ public final class RoomGeometry {
 	}
 
 	public static double maxZ(int room) {
-		return Plan.roomOrigin(room).getZ() + Plan.ROOM_SIZE - 1 + Plan.ROOM_MARGIN;
+		return Plan.roomOrigin(room).getZ() + SpaceFoldConfig.roomSize - 1 + Plan.ROOM_MARGIN;
 	}
 
 	private static double axisDistance(double value, double min, double max) {

@@ -39,9 +39,13 @@ public class FactoryMenu extends AbstractContainerMenu {
 		super(CoreModule.FACTORY_MENU.get(), containerId);
 		this.container = container;
 		this.data = data;
-		addSlot(new FactorySlot(container, FactoryBlockEntity.TEMPLATE_SLOT, 48, 35, 1));
+		addSlot(new FactorySlot(container, FactoryBlockEntity.TEMPLATE_SLOT, 80, 35));
 		addStandardInventorySlots(inventory, 8, 84);
 		addDataSlots(data);
+	}
+
+	public int progress() {
+		return data.get(0);
 	}
 
 	public int errorCode() {
@@ -52,11 +56,12 @@ public class FactoryMenu extends AbstractContainerMenu {
 	public boolean clickMenuButton(Player player, int buttonId) {
 		if (buttonId == BUTTON_MATERIALS && player instanceof ServerPlayer serverPlayer &&
 				container instanceof FactoryBlockEntity factory) {
-			KPacketSender.send(new SViewDetailsPacket(
-					factory.materialProgresses(),
-					true,
-					factory.templateSnapshotId(),
-					factory.getItem(FactoryBlockEntity.TEMPLATE_SLOT)), serverPlayer);
+			KPacketSender.send(
+					new SViewDetailsPacket(
+							factory.materialProgresses(),
+							true,
+							factory.templateSnapshotId(),
+							factory.getItem(FactoryBlockEntity.TEMPLATE_SLOT)), serverPlayer);
 			return true;
 		}
 		if (buttonId == BUTTON_CREATE && player.isCreative() && container instanceof FactoryBlockEntity factory) {
@@ -66,14 +71,14 @@ public class FactoryMenu extends AbstractContainerMenu {
 	}
 
 	@Override
-	public ItemStack quickMoveStack(Player player, int index) {
-		Slot slot = slots.get(index);
+	public ItemStack quickMoveStack(Player player, int slotIndex) {
+		Slot slot = slots.get(slotIndex);
 		if (!slot.hasItem()) {
 			return ItemStack.EMPTY;
 		}
 		ItemStack stack = slot.getItem();
 		ItemStack copy = stack.copy();
-		if (index < 1) {
+		if (slotIndex < 1) {
 			if (!moveItemStackTo(stack, 1, slots.size(), true)) {
 				return ItemStack.EMPTY;
 			}

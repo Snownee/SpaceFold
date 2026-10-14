@@ -17,6 +17,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
 import snownee.spacefold.CoreModule;
+import snownee.spacefold.SpaceFoldConfig;
 import snownee.spacefold.block.ChamberWallBlock;
 import snownee.spacefold.util.SpaceFoldUtil;
 
@@ -44,7 +45,6 @@ public final class RoomTreeGenerator {
 					SpaceFoldUtil.randomRates(),
 					SpaceFoldUtil.randomRates(),
 					List.of(),
-					false,
 					Optional.empty(),
 					tier[i],
 					ids[i]);
@@ -119,7 +119,7 @@ public final class RoomTreeGenerator {
 			SimulationResult[] results,
 			RegistryOps<Tag> ops,
 			RandomSource random) {
-		int size = Plan.ROOM_SIZE;
+		int size = SpaceFoldConfig.roomSize;
 		BlockState wall = CoreModule.CHAMBER_WALL.get().defaultBlockState();
 		BlockState window = random.nextFloat() < WINDOW_CHANCE ?
 				CoreModule.CHAMBER_WINDOW.get().defaultBlockState() :
@@ -139,7 +139,7 @@ public final class RoomTreeGenerator {
 				}
 			}
 		}
-		BlockPos center = new BlockPos(Plan.INNER_POS_OFFSET);
+		BlockPos center = new BlockPos(Plan.innerPosOffset());
 		addBlock(
 				palette,
 				indices,
@@ -172,9 +172,9 @@ public final class RoomTreeGenerator {
 
 	private static List<BlockPos> interiorSpots(BlockPos center, int count) {
 		List<BlockPos> spots = new ArrayList<>(count);
-		for (int dy = 1; dy < Plan.ROOM_SIZE - 1 && spots.size() < count; dy++) {
-			for (int dx = 1; dx < Plan.ROOM_SIZE - 1 && spots.size() < count; dx++) {
-				for (int dz = 1; dz < Plan.ROOM_SIZE - 1 && spots.size() < count; dz++) {
+		for (int dy = 1; dy < SpaceFoldConfig.roomSize - 1 && spots.size() < count; dy++) {
+			for (int dx = 1; dx < SpaceFoldConfig.roomSize - 1 && spots.size() < count; dx++) {
+				for (int dz = 1; dz < SpaceFoldConfig.roomSize - 1 && spots.size() < count; dz++) {
 					BlockPos pos = new BlockPos(dx, dy, dz);
 					if (!pos.equals(center)) {
 						spots.add(pos);

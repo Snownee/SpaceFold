@@ -18,7 +18,8 @@ import net.minecraft.resources.RegistryOps;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.context.BlockPlaceContext;import net.minecraft.world.level.Level;
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.DirectionalBlock;
@@ -29,7 +30,6 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.material.MapColor;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
 import snownee.kiwi.block.IKiwiBlock;
@@ -43,7 +43,7 @@ public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiw
 	public static final MapCodec<RepeaterBlock> CODEC = simpleCodec(RepeaterBlock::new);
 
 	public RepeaterBlock(BlockBehaviour.Properties properties) {
-		super(properties.mapColor(MapColor.COLOR_LIGHT_BLUE).strength(1.5F));
+		super(properties.strength(1.5F));
 		registerDefaultState(defaultBlockState().setValue(FACING, Direction.NORTH));
 	}
 
@@ -112,7 +112,8 @@ public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiw
 
 	@Override
 	public @Nullable BlockState getStateForPlacement(BlockPlaceContext context) {
-		return defaultBlockState().setValue(FACING, context.getNearestLookingDirection().getOpposite());
+		Direction facing = context.getNearestLookingDirection();
+		return defaultBlockState().setValue(FACING, context.isSecondaryUseActive() ? facing : facing.getOpposite());
 	}
 
 	@Override

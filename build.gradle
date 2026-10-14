@@ -66,6 +66,8 @@ dependencies {
     runtimeOnly "maven.modrinth:orthocamera:0.1.10+26.1"
     runtimeOnly "maven.modrinth:jei:29.43.0.107"
     runtimeOnly "maven.modrinth:mezzconfig:H7JmEX05"
+//    runtimeOnly "maven.modrinth:distanthorizons:3.3.3-26.1.2"
+//    runtimeOnly "maven.modrinth:ok-zoomer:17.0.0-beta.6"
 }
 
 processResources {

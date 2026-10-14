@@ -3,13 +3,11 @@
   "category": "equipment",
   "key": {
     "A": "minecraft:amethyst_shard",
-    "E": "minecraft:ender_pearl",
-    "I": "minecraft:iron_ingot"
+    "E": "minecraft:end_rod"
   },
   "pattern": [
-    "  A",
-    " E ",
-    "I  "
+    "A",
+    "E"
   ],
   "result": {
     "id": "spacefold:opener"

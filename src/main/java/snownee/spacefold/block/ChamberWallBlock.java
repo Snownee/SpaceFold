@@ -18,6 +18,7 @@ import net.minecraft.world.level.block.state.BlockBehaviour;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.material.MapColor;
+import net.minecraft.world.level.material.PushReaction;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.EntityCollisionContext;
@@ -33,7 +34,7 @@ public class ChamberWallBlock extends DirectionalBlock {
 	}
 
 	private static BlockBehaviour.Properties configure(BlockBehaviour.Properties properties) {
-		return properties.mapColor(MapColor.STONE)
+		return properties.mapColor(MapColor.NONE)
 				.strength(-1.0F, 3600000.8F)
 				.noOcclusion()
 				.noLootTable()
@@ -41,6 +42,7 @@ public class ChamberWallBlock extends DirectionalBlock {
 				.forceSolidOn()
 				.isSuffocating(Blocks::never)
 				.isViewBlocking(Blocks::never)
+				.pushReaction(PushReaction.BLOCK)
 				.noTerrainParticles();
 	}
 

@@ -3,6 +3,8 @@ package snownee.spacefold.util;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import org.jspecify.annotations.Nullable;
+
 import com.mojang.datafixers.util.Pair;
 import com.mojang.datafixers.util.Unit;
 import com.mojang.serialization.Codec;
@@ -18,7 +20,7 @@ public final class Int2ObjectCodec {
 	private Int2ObjectCodec() {
 	}
 
-	public static <V> Codec<Int2ObjectMap<V>> of(Codec<V> elementCodec) {
+	public static <V> Codec<Int2ObjectMap<@Nullable V>> of(Codec<V> elementCodec) {
 		return new Codec<>() {
 			@Override
 			public <T> DataResult<Pair<Int2ObjectMap<V>, T>> decode(DynamicOps<T> ops, T input) {

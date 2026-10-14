@@ -16,7 +16,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.block.ChamberWallBlock;
 import snownee.spacefold.block.InterfaceBlock;
-import snownee.spacefold.dim.RoomProtection;
 import snownee.spacefold.dim.Simulate;
 
 public class OpenerItem extends Item {
@@ -63,7 +62,7 @@ public class OpenerItem extends Item {
 		if (level.dimension().equals(Simulate.DIMENSION)) {
 			return InteractionResult.PASS;
 		}
-		RoomProtection.runInternal(() -> level.setBlock(pos, converted, Block.UPDATE_ALL));
+		level.setBlock(pos, converted, Block.UPDATE_ALL);
 		ServerLevel serverLevel = (ServerLevel) level;
 		serverLevel.sendParticles(
 				ParticleTypes.END_ROD,

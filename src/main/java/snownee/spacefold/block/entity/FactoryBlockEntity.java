@@ -20,6 +20,8 @@ import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.ai.village.poi.PoiManager;
 import net.minecraft.world.entity.ai.village.poi.PoiType;
@@ -144,6 +146,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 				pendingItem = ItemStack.EMPTY;
 				setItem(TEMPLATE_SLOT, stack);
 				shake();
+				level.playSound(null, getBlockPos(), SoundEvents.AMETHYST_CLUSTER_PLACE, SoundSource.BLOCKS, 1.0F, 0.9F + level.getRandom().nextFloat() * 0.2F);
 			}
 			return;
 		}
@@ -383,6 +386,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 		int duration = 10;
 		receiver.acceptPending(made, duration);
 		shake();
+		level.playSound(null, getBlockPos(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 0.8F + level.getRandom().nextFloat() * 0.4F);
 		Vec3 from = Vec3.atCenterOf(getBlockPos().above());
 		Vec3 to = Vec3.atCenterOf(receiver.getBlockPos().above());
 		((ServerLevel) level).sendParticles(new BeamParticleOptions(from, to, duration), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
@@ -391,6 +395,11 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	@Override
 	public int getContainerSize() {
 		return 2;
+	}
+
+	@Override
+	public int getMaxStackSize() {
+		return item.isEmpty() ? Container.super.getMaxStackSize() : 1;
 	}
 
 	@Override
@@ -459,7 +468,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	@Override
 	public boolean canPlaceItem(int slot, ItemStack itemStack) {
 		if (slot == TEMPLATE_SLOT) {
-			return pendingItem.isEmpty();
+			return item.isEmpty() && pendingItem.isEmpty();
 		}
 		if (slot == MATERIAL_SLOT) {
 			return requiredAmount(ItemVariant.of(itemStack)) > 0;
@@ -533,7 +542,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 				return materialMoved;
 			}
 			ItemStack incoming = resource.toStack(1);
-			if (!canPlaceItem(TEMPLATE_SLOT, incoming) || !item.isEmpty() || !pendingItem.isEmpty()) {
+			if (!canPlaceItem(TEMPLATE_SLOT, incoming)) {
 				return 0;
 			}
 			item = incoming;

@@ -161,7 +161,6 @@ public class RepeaterContainer implements Container {
 						new SimulationResult.Rates(inputs.items(), inputs.fluids(), base == null ? 0 : base.inputs().energy()),
 						new SimulationResult.Rates(outputs.items(), outputs.fluids(), base == null ? 0 : base.outputs().energy()),
 						collectMaterials(RepeaterMenu.MATERIAL_SIGN + 1),
-						false,
 						Optional.empty(),
 						base == null ? 1 : base.tier(),
 						base == null ? SimulationResult.NO_SNAPSHOT : base.snapshotId()));

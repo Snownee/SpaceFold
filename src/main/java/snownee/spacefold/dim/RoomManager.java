@@ -22,9 +22,13 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.util.datafix.DataFixTypes;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -40,6 +44,7 @@ import net.minecraft.world.phys.Vec3;
 import snownee.kiwi.network.KPacketSender;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
+import snownee.spacefold.SpaceFoldConfig;
 import snownee.spacefold.block.ChamberWallBlock;
 import snownee.spacefold.block.InterfaceBlock;
 import snownee.spacefold.block.SimulatorBlock;
@@ -49,6 +54,7 @@ import snownee.spacefold.network.SHighlightBlocksPacket;
 public final class RoomManager {
 	public static final int HIGHLIGHT_COLOR = 0xFF3B30;
 	public static final int HIGHLIGHT_LIFE = 200;
+	public static final int TELEPORT_COOLDOWN = 20;
 
 	private static final int TELEPORT_PRELOAD_RADIUS = 2;
 	private static final int MAX_SNAPSHOTS_PER_ROOM = 3;
@@ -65,44 +71,61 @@ public final class RoomManager {
 	private RoomManager() {
 	}
 
-	public static void useSimulator(ServerLevel level, ServerPlayer player, BlockPos pos, boolean windows) {
+	public static void useSimulator(ServerLevel level, Entity entity, BlockPos pos, boolean windows) {
 		if (!(level.getBlockEntity(pos) instanceof SimulatorBlockEntity blockEntity)) {
-			player.sendOverlayMessage(Component.translatable("tip.spacefold.link_broken"));
+			feedback(entity, "link_broken");
 			return;
 		}
 		int room = blockEntity.getRoomIndex();
-		if (isRoomDimension(level.dimension())) {
+		if (isRoomDimension(level)) {
 			GlobalPos sourceRef = room < 0 ? null : source(level, room);
 			if (sourceRef == null) {
-				player.sendOverlayMessage(Component.translatable("tip.spacefold.link_broken"));
+				feedback(entity, "link_broken");
 				return;
 			}
 			ServerLevel destination = level.getServer().getLevel(sourceRef.dimension());
 			BlockPos link = sourceRef.pos();
-			if (destination == null || !(destination.getBlockState(link).getBlock() instanceof SimulatorBlock)) {
-				player.sendOverlayMessage(Component.translatable("tip.spacefold.link_broken"));
+			if (destination == null || !CoreModule.SIMULATOR.is(destination.getBlockState(link))) {
+				feedback(entity, "link_broken");
 				return;
 			}
-			Vec3 landing = safeLanding(destination, link);
-			teleportLookingAt(player, destination, landing.x, landing.y, landing.z, link);
+			Vec3 landing = safeLanding(entity.getType(), destination, link);
+			teleportLookingAt(entity, destination, landing.x, landing.y, landing.z, link);
 			return;
 		}
 
 		ServerLevel plan = Objects.requireNonNull(level.getServer().getLevel(Plan.DIMENSION));
 		if (room < 0) {
-			room = allocate(plan, player.getUUID());
+			room = allocate(plan, entity.getUUID());
 			blockEntity.setRoom(room);
 		}
 		setSource(level, room, pos, level.dimension());
-		BlockPos inner = innerPos(room);
-		if (!(plan.getBlockState(inner).getBlock() instanceof SimulatorBlock)) {
+		BlockPos simulator = simulatorPos(plan, room);
+		if (simulator == null) {
 			buildRoom(plan, room, windows);
+			simulator = innerPos(room);
 		}
-		((SimulatorBlockEntity) Objects.requireNonNull(plan.getBlockEntity(inner))).setRoom(room);
+		if (plan.getBlockEntity(simulator) instanceof SimulatorBlockEntity simulatorEntity) {
+			simulatorEntity.setRoom(room);
+		}
 
 		int targetRoom = room;
-		ResourceKey<Level> sourceDim = level.dimension();
-		preloadAndRun(plan, targetRoom, () -> teleportIntoRoom(player, sourceDim, Plan.DIMENSION, targetRoom));
+		BlockPos targetSimulator = simulator;
+		preloadAndRun(plan, targetRoom, () -> teleportIntoRoom(level, entity, Plan.DIMENSION, targetRoom, targetSimulator));
+	}
+
+	private static void feedback(Entity entity, String key) {
+		if (entity instanceof ServerPlayer player) {
+			player.sendOverlayMessage(Component.translatable("tip.spacefold." + key));
+		}
+	}
+
+	private static void playTeleportSound(Level level, BlockPos pos) {
+		level.playSound(null, pos, SoundEvents.ENDERMAN_TELEPORT, SoundSource.NEUTRAL, 0.6F, 1.0F);
+	}
+
+	public static boolean isRoomDimension(Level level) {
+		return isRoomDimension(level.dimension());
 	}
 
 	public static boolean isRoomDimension(ResourceKey<Level> dimension) {
@@ -117,8 +140,7 @@ public final class RoomManager {
 		}
 		SimulationManager.RoomStatus status = SimulationManager.roomStatus(level, room);
 		if (status != SimulationManager.RoomStatus.READY) {
-			player.sendOverlayMessage(Component.translatable(status == SimulationManager.RoomStatus.RUNNING ?
-					"tip.spacefold.simulation_running" : "tip.spacefold.simulation_cooldown"));
+			feedback(player, status == SimulationManager.RoomStatus.RUNNING ? "simulation_running" : "simulation_cooldown");
 			return false;
 		}
 		ServerLevel source = Objects.requireNonNull(level.getServer().getLevel(Plan.DIMENSION));
@@ -154,7 +176,7 @@ public final class RoomManager {
 		preloadAndRun(
 				simulateLevel, room, () -> {
 					SimulationManager.start(simulateLevel, room, sourceDim, sourcePos);
-					teleportIntoRoom(player, Plan.DIMENSION, Simulate.DIMENSION, room);
+					teleportIntoRoom(player.level(), player, Simulate.DIMENSION, room, innerPos(room));
 				});
 	}
 
@@ -170,60 +192,83 @@ public final class RoomManager {
 				}));
 	}
 
-	private static void teleportIntoRoom(ServerPlayer player, ResourceKey<Level> fromDimension, ResourceKey<Level> toDimension, int room) {
-		if (player.isRemoved() || !player.level().dimension().equals(fromDimension)) {
+	private static void teleportIntoRoom(
+			ServerLevel fromLevel,
+			Entity entity,
+			ResourceKey<Level> toDimension,
+			int room,
+			BlockPos simulator) {
+		ResourceKey<Level> fromDimension = fromLevel.dimension();
+		if (entity.isRemoved() || !entity.level().dimension().equals(fromDimension)) {
 			return;
 		}
-		teleportToRoomOutside(player, toDimension, room);
-		PlanConfinement.lock(player, room);
-		PlanFlight.enable(player);
+		if (entity instanceof ServerPlayer player) {
+			teleportToRoomOutside(entity, toDimension, room);
+			PlanConfinement.lock(player, room);
+			PlanFlight.enable(player);
+		} else {
+			ServerLevel destination = Objects.requireNonNull(fromLevel.getServer().getLevel(toDimension));
+			Vec3 landing = safeLanding(entity.getType(), destination, simulator);
+			entity.setPortalCooldown(TELEPORT_COOLDOWN);
+			teleportLookingAt(entity, destination, landing.x, landing.y, landing.z, simulator);
+		}
 	}
 
 	private static void mirror(ServerLevel source, ServerLevel destination, int room) {
 		BlockPos origin = roomOrigin(room);
-		BlockPos max = origin.offset(Plan.ROOM_SIZE - 1, Plan.ROOM_SIZE - 1, Plan.ROOM_SIZE - 1);
+		BlockPos max = origin.offset(SpaceFoldConfig.roomSize - 1, SpaceFoldConfig.roomSize - 1, SpaceFoldConfig.roomSize - 1);
 		destination.getChunkAt(origin);
 		destination.getChunkAt(max);
 		BoundingBox box = BoundingBox.fromCorners(origin, max);
 		HolderLookup.Provider registries = source.registryAccess();
-		RoomProtection.runInternal(() -> {
-			for (int dx = 0; dx < Plan.ROOM_SIZE; dx++) {
-				for (int dy = 0; dy < Plan.ROOM_SIZE; dy++) {
-					for (int dz = 0; dz < Plan.ROOM_SIZE; dz++) {
+		{
+			for (int dx = 0; dx < SpaceFoldConfig.roomSize; dx++) {
+				for (int dy = 0; dy < SpaceFoldConfig.roomSize; dy++) {
+					for (int dz = 0; dz < SpaceFoldConfig.roomSize; dz++) {
 						BlockPos at = origin.offset(dx, dy, dz);
 						BlockState state = source.getBlockState(at);
-						destination.setBlock(at, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
+						destination.setBlock(at, state, Block.UPDATE_CLIENTS);
 						if (!state.isAir()) {
-							BlockEntity sourceBlockEntity = source.getBlockEntity(at);
-							if (sourceBlockEntity != null) {
-								CompoundTag tag = sourceBlockEntity.saveWithFullMetadata(registries);
-								BlockEntity targetBlockEntity = BlockEntity.loadStatic(at, state, tag, registries);
-								if (targetBlockEntity != null) {
-									destination.setBlockEntity(targetBlockEntity);
+							if (!state.is(CoreModule.MIRROR_NBT_IGNORED)) {
+								BlockEntity sourceBlockEntity = source.getBlockEntity(at);
+								if (sourceBlockEntity != null) {
+									CompoundTag tag = sourceBlockEntity.saveWithFullMetadata(registries);
+//									if (sourceBlockEntity instanceof PistonMovingBlockEntity moving) {
+//										tag.putFloat("progress", moving.getProgress(1.0F));
+//									}
+									BlockEntity targetBlockEntity = BlockEntity.loadStatic(at, state, tag, registries);
+									if (targetBlockEntity != null) {
+										destination.setBlockEntity(targetBlockEntity);
+									}
 								}
 							}
+							BlockContentChecker.clear(destination, at);
 						}
 					}
 				}
 			}
 			destination.getBlockTicks().clearArea(box);
-			destination.getBlockTicks().copyAreaFrom(source.getBlockTicks(), box, Vec3i.ZERO);
 			destination.getFluidTicks().clearArea(box);
-			destination.getFluidTicks().copyAreaFrom(source.getFluidTicks(), box, Vec3i.ZERO);
-		});
+			SimulationManager.withCopyTriggerOffset(
+					destination.getGameTime() - source.getGameTime(),
+					() -> {
+						destination.getBlockTicks().copyAreaFrom(source.getBlockTicks(), box, Vec3i.ZERO);
+						destination.getFluidTicks().copyAreaFrom(source.getFluidTicks(), box, Vec3i.ZERO);
+					});
+		}
 	}
 
 	public static RoomCheck checkRoom(ServerLevel plan, int room) {
 		BlockPos origin = roomOrigin(room);
-		int max = Plan.ROOM_SIZE - 1;
+		int max = SpaceFoldConfig.roomSize - 1;
 		List<BlockPos> illegal = new ArrayList<>();
 		List<List<BlockPos>> faces = new ArrayList<>(6);
 		for (int i = 0; i < 6; i++) {
 			faces.add(new ArrayList<>());
 		}
-		for (int dx = 0; dx < Plan.ROOM_SIZE; dx++) {
-			for (int dy = 0; dy < Plan.ROOM_SIZE; dy++) {
-				for (int dz = 0; dz < Plan.ROOM_SIZE; dz++) {
+		for (int dx = 0; dx < SpaceFoldConfig.roomSize; dx++) {
+			for (int dy = 0; dy < SpaceFoldConfig.roomSize; dy++) {
+				for (int dz = 0; dz < SpaceFoldConfig.roomSize; dz++) {
 					BlockPos at = origin.offset(dx, dy, dz);
 					BlockState state = plan.getBlockState(at);
 					Block block = state.getBlock();
@@ -357,7 +402,7 @@ public final class RoomManager {
 			if (level.dimension().equals(Plan.DIMENSION)) {
 				RoomManager.setPreviewSnapshot(level, room, RoomManager.captureSnapshot(level, room));
 				result = SimulationResult.previewOnly(RoomSnapshot.previewId(room));
-			} else if (RoomManager.previewSnapshot(level, room) != null) {
+			} else {
 				result = SimulationResult.previewOnly(RoomSnapshot.previewId(room));
 			}
 		}
@@ -386,7 +431,7 @@ public final class RoomManager {
 	}
 
 	public static RoomSnapshot captureSnapshot(ServerLevel level, int room) {
-		return RoomSnapshot.capture(level, room, roomOrigin(room), Plan.ROOM_SIZE);
+		return RoomSnapshot.capture(level, room, roomOrigin(room), SpaceFoldConfig.roomSize);
 	}
 
 	public static int allocateSnapshot(ServerLevel level, RoomSnapshot snapshot) {
@@ -405,7 +450,7 @@ public final class RoomManager {
 		List<Integer> ids = existing == null ? new ArrayList<>() : new ArrayList<>(existing);
 		ids.add(id);
 		while (ids.size() > MAX_SNAPSHOTS_PER_ROOM) {
-			ids.remove(0);
+			ids.removeFirst();
 		}
 		rooms.snapshots.put(snapshot.room(), ids);
 		rooms.setDirty();
@@ -428,7 +473,7 @@ public final class RoomManager {
 		BlockPos origin = roomOrigin(room);
 		plan.getChunkAt(origin);
 		HolderLookup.Provider registries = plan.registryAccess();
-		RoomProtection.runInternal(() -> {
+		{
 			for (RoomSnapshot.Entry entry : snapshot.blocks()) {
 				BlockPos at = origin.offset(entry.x(), entry.y(), entry.z());
 				BlockState state = snapshot.palette().get(entry.state());
@@ -441,7 +486,7 @@ public final class RoomManager {
 					}
 				}
 			}
-		});
+		}
 		BlockPos inner = innerPos(room);
 		if (plan.getBlockEntity(inner) instanceof SimulatorBlockEntity simulator) {
 			simulator.setRoom(room);
@@ -460,21 +505,44 @@ public final class RoomManager {
 	}
 
 	public static BlockPos innerPos(int room) {
-		return roomOrigin(room).offset(Plan.INNER_POS_OFFSET);
+		return roomOrigin(room).offset(Plan.innerPosOffset());
+	}
+
+	public static @Nullable BlockPos simulatorPos(ServerLevel plan, int room) {
+		BlockPos origin = roomOrigin(room);
+		BlockPos inner = innerPos(room);
+		if (CoreModule.SIMULATOR.is(plan.getBlockState(inner))) {
+			return inner;
+		}
+		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+		for (int dx = 0; dx < SpaceFoldConfig.roomSize; dx++) {
+			for (int dy = 0; dy < SpaceFoldConfig.roomSize; dy++) {
+				for (int dz = 0; dz < SpaceFoldConfig.roomSize; dz++) {
+					cursor.setWithOffset(origin, dx, dy, dz);
+					if (inner.equals(cursor)) {
+						continue;
+					}
+					if (CoreModule.SIMULATOR.is(plan.getBlockState(cursor))) {
+						return cursor;
+					}
+				}
+			}
+		}
+		return null;
 	}
 
 	private static void buildRoom(ServerLevel plan, int room, boolean windows) {
 		BlockPos origin = roomOrigin(room);
 		plan.getChunkAt(origin);
 		BlockPos inner = innerPos(room);
-		RoomProtection.runInternal(() -> {
+		{
 			BlockState wall = CoreModule.CHAMBER_WALL.get().defaultBlockState();
 			BlockState window = windows ? CoreModule.CHAMBER_WINDOW.get().defaultBlockState() : wall;
 			BlockState air = Blocks.AIR.defaultBlockState();
 			int flags = Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
-			for (int dx = 0; dx < Plan.ROOM_SIZE; dx++) {
-				for (int dy = 0; dy < Plan.ROOM_SIZE; dy++) {
-					for (int dz = 0; dz < Plan.ROOM_SIZE; dz++) {
+			for (int dx = 0; dx < SpaceFoldConfig.roomSize; dx++) {
+				for (int dy = 0; dy < SpaceFoldConfig.roomSize; dy++) {
+					for (int dz = 0; dz < SpaceFoldConfig.roomSize; dz++) {
 						Direction facing = inwardDirection(dx, dy, dz);
 						BlockState state = facing == null ? air : (facing == Direction.UP ? wall : window).setValue(
 								ChamberWallBlock.FACING,
@@ -484,12 +552,12 @@ public final class RoomManager {
 				}
 			}
 			plan.setBlock(inner, CoreModule.SIMULATOR.get().defaultBlockState(), Block.UPDATE_ALL);
-		});
+		}
 		((SimulatorBlockEntity) Objects.requireNonNull(plan.getBlockEntity(inner))).setRoom(room);
 	}
 
 	static @Nullable Direction inwardDirection(int dx, int dy, int dz) {
-		int max = Plan.ROOM_SIZE - 1;
+		int max = SpaceFoldConfig.roomSize - 1;
 		boolean xMin = dx == 0;
 		boolean xMax = dx == max;
 		boolean yMin = dy == 0;
@@ -524,7 +592,7 @@ public final class RoomManager {
 		int localX = pos.getX() - gridX * Plan.ROOM_GAP;
 		int localZ = pos.getZ() - gridZ * Plan.ROOM_GAP;
 		int localY = pos.getY() - Plan.FLOOR_Y;
-		if (localX >= Plan.ROOM_SIZE || localZ >= Plan.ROOM_SIZE || localY < 0 || localY >= Plan.ROOM_SIZE) {
+		if (localX >= SpaceFoldConfig.roomSize || localZ >= SpaceFoldConfig.roomSize || localY < 0 || localY >= SpaceFoldConfig.roomSize) {
 			return -1;
 		}
 		int room = gridZ * Plan.GRID_WIDTH + gridX;
@@ -536,7 +604,7 @@ public final class RoomManager {
 		int lx = pos.getX() - origin.getX();
 		int ly = pos.getY() - origin.getY();
 		int lz = pos.getZ() - origin.getZ();
-		int max = Plan.ROOM_SIZE - 1;
+		int max = SpaceFoldConfig.roomSize - 1;
 		return lx == 0 || lx == max || ly == 0 || ly == max || lz == 0 || lz == max;
 	}
 
@@ -561,11 +629,11 @@ public final class RoomManager {
 	private static boolean contains(int room, double x, double y, double z) {
 		BlockPos origin = roomOrigin(room);
 		double minX = origin.getX() - Plan.ROOM_MARGIN;
-		double maxX = origin.getX() + Plan.ROOM_SIZE - 1 + Plan.ROOM_MARGIN;
+		double maxX = origin.getX() + SpaceFoldConfig.roomSize - 1 + Plan.ROOM_MARGIN;
 		double minY = origin.getY() - Plan.ROOM_MARGIN;
-		double maxY = origin.getY() + Plan.ROOM_SIZE - 1 + Plan.ROOM_MARGIN;
+		double maxY = origin.getY() + SpaceFoldConfig.roomSize - 1 + Plan.ROOM_MARGIN;
 		double minZ = origin.getZ() - Plan.ROOM_MARGIN;
-		double maxZ = origin.getZ() + Plan.ROOM_SIZE - 1 + Plan.ROOM_MARGIN;
+		double maxZ = origin.getZ() + SpaceFoldConfig.roomSize - 1 + Plan.ROOM_MARGIN;
 		return x >= minX && x <= maxX && y >= minY && y <= maxY && z >= minZ && z <= maxZ;
 	}
 
@@ -585,32 +653,45 @@ public final class RoomManager {
 		return rooms(plan).nextIndex;
 	}
 
-	static void teleportToRoomOutside(ServerPlayer player, ResourceKey<Level> dimension, int room) {
+	static void teleportToRoomOutside(Entity entity, ResourceKey<Level> dimension, int room) {
 		Preconditions.checkArgument(isRoomDimension(dimension), "Dimension must be a room dimension");
 		BlockPos origin = roomOrigin(room);
-		ServerLevel level = Objects.requireNonNull(player.level().getServer()).getLevel(dimension);
+		ServerLevel level = Objects.requireNonNull(entity.level().getServer()).getLevel(dimension);
 		if (level == null) {
 			return;
 		}
-		teleportLookingAt(player, level, origin.getX() - 1.5, Plan.FLOOR_Y + 2.0, origin.getZ() + Plan.ROOM_SIZE / 2.0, innerPos(room));
+		teleportLookingAt(
+				entity,
+				level,
+				origin.getX() - 1.5,
+				Plan.FLOOR_Y + 2.0,
+				origin.getZ() + SpaceFoldConfig.roomSize / 2.0,
+				innerPos(room));
 	}
 
-	static void teleport(ServerPlayer player, ServerLevel level, double x, double y, double z, float yRot, float xRot) {
-		player.teleport(new TeleportTransition(level, new Vec3(x, y, z), Vec3.ZERO, yRot, xRot, Set.of(), TeleportTransition.DO_NOTHING));
+	static void teleport(Entity entity, ServerLevel level, double x, double y, double z, float yRot, float xRot, Set<Relative> relatives) {
+		playTeleportSound(entity.level(), entity.blockPosition());
+		entity.teleport(new TeleportTransition(level, new Vec3(x, y, z), Vec3.ZERO, yRot, xRot, relatives, TeleportTransition.DO_NOTHING));
+		playTeleportSound(level, BlockPos.containing(x, y, z));
 	}
 
-	private static void teleportLookingAt(ServerPlayer player, ServerLevel level, double x, double y, double z, BlockPos target) {
-		double dx = target.getX() + 0.5 - x;
-		double dy = target.getY() + 0.5 - (y + player.getEyeHeight());
-		double dz = target.getZ() + 0.5 - z;
-		double horizontal = Math.sqrt(dx * dx + dz * dz);
-		float yRot = (float) (Mth.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0F;
-		float xRot = (float) -(Mth.atan2(dy, horizontal) * (180.0 / Math.PI));
-		teleport(player, level, x, y, z, yRot, xRot);
+	private static void teleportLookingAt(Entity entity, ServerLevel level, double x, double y, double z, BlockPos target) {
+		boolean isPlayer = entity instanceof ServerPlayer;
+		float yRot = 0.0F;
+		float xRot = 0.0F;
+		if (isPlayer) {
+			double dx = target.getX() + 0.5 - x;
+			double dy = target.getY() + 0.5 - (y + entity.getEyeHeight());
+			double dz = target.getZ() + 0.5 - z;
+			double horizontal = Math.sqrt(dx * dx + dz * dz);
+			yRot = (float) (Mth.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0F;
+			xRot = (float) -(Mth.atan2(dy, horizontal) * (180.0 / Math.PI));
+		}
+		teleport(entity, level, x, y, z, yRot, xRot, isPlayer ? Set.of() : Relative.ROTATION);
 	}
 
-	private static Vec3 safeLanding(ServerLevel level, BlockPos link) {
-		return RespawnAnchorBlock.findStandUpPosition(EntityType.PLAYER, level, link)
+	private static Vec3 safeLanding(EntityType<?> entityType, ServerLevel level, BlockPos link) {
+		return RespawnAnchorBlock.findStandUpPosition(entityType, level, link)
 				.orElseGet(() -> new Vec3(link.getX() + 0.5, link.getY() + 1.0, link.getZ() + 0.5));
 	}
 

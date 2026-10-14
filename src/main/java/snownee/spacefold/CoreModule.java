@@ -11,7 +11,6 @@ import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.Identifier;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.tags.TagKey;
@@ -22,6 +21,7 @@ import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.display.SlotDisplay;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import snownee.kiwi.AbstractModule;
 import snownee.kiwi.BlockObject;
@@ -59,18 +59,17 @@ import team.reborn.energy.api.EnergyStorage;
 public final class CoreModule extends AbstractModule {
 	public static final TagKey<Block> ROOM_INVALID = blockTag("room_invalid");
 	public static final TagKey<Block> ROOM_IGNORED = blockTag("room_ignored");
+	public static final TagKey<Block> MIRROR_NBT_IGNORED = blockTag("mirror_nbt_ignored");
 	public static final TagKey<Block> CHAMBER_WINDOWS = blockTag("chamber_windows");
-	public static final ResourceKey<PoiType> FACTORY_POI = ResourceKey.create(
-			Registries.POINT_OF_INTEREST_TYPE,
-			Identifier.fromNamespaceAndPath(SpaceFold.ID, "factory"));
+	public static final ResourceKey<PoiType> FACTORY_POI = ResourceKey.create(Registries.POINT_OF_INTEREST_TYPE, SpaceFold.id("factory"));
 
 	public static final BlockObject<ChamberWallBlock> CHAMBER_WALL = block(ChamberWallBlock::new);
 	public static final BlockObject<ChamberWallBlock> CHAMBER_WINDOW = block(ChamberWallBlock::new);
 	public static final BlockObject<InterfaceBlock> INTERFACE = block(InterfaceBlock::new);
 	public static final BlockObject<InterfaceBlock> INTERFACE_WINDOW = block(InterfaceBlock::new);
-	public static final BlockObject<SimulatorBlock> SIMULATOR = block(SimulatorBlock::new);
-	public static final BlockObject<RepeaterBlock> REPEATER = block(RepeaterBlock::new);
-	public static final BlockObject<FactoryBlock> FACTORY = block(FactoryBlock::new);
+	public static final BlockObject<SimulatorBlock> SIMULATOR = block(SimulatorBlock::new, () -> Blocks.CRYING_OBSIDIAN);
+	public static final BlockObject<RepeaterBlock> REPEATER = block(RepeaterBlock::new, () -> Blocks.IRON_BLOCK);
+	public static final BlockObject<FactoryBlock> FACTORY = block(FactoryBlock::new, () -> Blocks.CRYING_OBSIDIAN);
 	public static final ItemObject<OpenerItem> OPENER = item(OpenerItem::new);
 	@KiwiModule.Name("simulation")
 	public static final KiwiGO<TicketType> SIMULATION_TICKET = go(
@@ -116,8 +115,8 @@ public final class CoreModule extends AbstractModule {
 	public static final KiwiGO<ParticleType<BeamParticleOptions>> BEAM = go(BeamParticleType::new, Registries.PARTICLE_TYPE);
 	@KiwiModule.Name("main")
 	public static final KiwiGO<CreativeModeTab> TAB = go(() -> itemCategory(
-			Identifier.fromNamespaceAndPath(SpaceFold.ID, "main"),
-			() -> new ItemStack(CoreModule.REPEATER)).build());
+			SpaceFold.id("main"),
+			() -> new ItemStack(SIMULATOR)).build());
 	@KiwiModule.Name("simulation")
 	public static final KiwiGO<SlotDisplay.Type<SimulationSlotDisplay>> SIMULATION_DISPLAY = go(
 			() -> SimulationSlotDisplay.TYPE,

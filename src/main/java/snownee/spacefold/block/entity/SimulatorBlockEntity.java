@@ -3,9 +3,12 @@ package snownee.spacefold.block.entity;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.objects.Object2LongMap;
+import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.api.transfer.v1.storage.Storage;
@@ -20,19 +23,27 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Nameable;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
 import snownee.kiwi.block.entity.ModBlockEntity;
 import snownee.spacefold.CoreModule;
+import snownee.spacefold.dim.RoomManager;
 import snownee.spacefold.dim.Simulate;
 import snownee.spacefold.dim.SimulationManager;
 import team.reborn.energy.api.EnergyStorage;
 
 public class SimulatorBlockEntity extends ModBlockEntity implements Nameable {
+	private static final long TELEPORT_DELAY = 20L;
+	private static final long STAND_GAP = 1L;
+	private static final int MAX_TRACKED = 64;
+
 	private final ItemPort[] itemPorts = new ItemPort[6];
 	private final FluidPort[] fluidPorts = new FluidPort[6];
 	private final EnergyPort[] energyPorts = new EnergyPort[6];
+	private final Object2LongMap<UUID> standStart = new Object2LongOpenHashMap<>();
+	private final Object2LongMap<UUID> standLast = new Object2LongOpenHashMap<>();
 
 	private int roomIndex = -1;
 	private @Nullable Component name;
@@ -84,6 +95,34 @@ public class SimulatorBlockEntity extends ModBlockEntity implements Nameable {
 
 	public int getRoomIndex() {
 		return roomIndex;
+	}
+
+	public void onStepped(ServerLevel level, Entity entity) {
+		if (roomIndex < 0) {
+			return;
+		}
+		long now = level.getGameTime();
+		UUID id = entity.getUUID();
+		if (standLast.size() >= MAX_TRACKED) {
+			standLast.object2LongEntrySet().removeIf(entry -> {
+				if (now - entry.getLongValue() > STAND_GAP) {
+					standStart.removeLong(entry.getKey());
+					return true;
+				}
+				return false;
+			});
+		}
+		long start = standLast.containsKey(id) && now - standLast.getLong(id) <= STAND_GAP
+				? standStart.getLong(id)
+				: now;
+		standLast.put(id, now);
+		if (now - start >= TELEPORT_DELAY) {
+			standStart.removeLong(id);
+			standLast.removeLong(id);
+			RoomManager.useSimulator(level, entity, worldPosition, true);
+			return;
+		}
+		standStart.put(id, start);
 	}
 
 	@Override

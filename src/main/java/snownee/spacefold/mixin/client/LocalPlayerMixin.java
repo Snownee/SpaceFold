@@ -19,7 +19,7 @@ public abstract class LocalPlayerMixin {
 		if (!SpaceFoldConfig.confinementEnabled) {
 			return;
 		}
-		if (!RoomManager.isRoomDimension(player.level().dimension())) {
+		if (!RoomManager.isRoomDimension(player.level())) {
 			return;
 		}
 		if (player.isCreative()) {

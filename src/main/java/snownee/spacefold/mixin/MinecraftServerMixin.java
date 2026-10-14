@@ -22,10 +22,13 @@ public abstract class MinecraftServerMixin {
 					value = "INVOKE",
 					target = "Lnet/minecraft/server/level/ServerLevel;tick(Ljava/util/function/BooleanSupplier;)V"))
 	private void spacefold$tickLevel(ServerLevel level, BooleanSupplier haveTime, Operation<Void> original) {
-		int times = level.dimension().equals(Simulate.DIMENSION) && SimulationManager.hasActive()
-				? Math.max(1, SpaceFoldConfig.simulationTickMultiplier)
-				: 1;
+		if (!level.dimension().equals(Simulate.DIMENSION) || !SimulationManager.hasActive()) {
+			original.call(level, haveTime);
+			return;
+		}
+		int times = Math.max(1, SpaceFoldConfig.simulationTickMultiplier);
 		for (int i = 0; i < times; i++) {
+			SimulationManager.advanceGameTime();
 			original.call(level, haveTime);
 		}
 	}

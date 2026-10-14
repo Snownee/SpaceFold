@@ -944,13 +944,13 @@ public class DetailsScreen extends Screen {
 	}
 
 	private void ensureGraph(RoomSnapshot snapshot) {
-		int version = PreviewCache.version();
+		int structureVersion = PreviewCache.structureVersion();
 		boolean rootChanged = snapshotId != graphSnapshotId;
-		if (!rootChanged && version == graphVersion) {
+		if (!rootChanged && structureVersion == graphVersion) {
 			return;
 		}
 		graphSnapshotId = snapshotId;
-		graphVersion = version;
+		graphVersion = structureVersion;
 		IntFunction<List<ItemStack>> childrenLookup = id -> {
 			RoomSnapshot child = id == snapshotId ? snapshot : PreviewCache.getSnapshot(id);
 			return child == null ? null : child.topRepeaterResults(Objects.requireNonNull(minecraft.level).registryAccess());

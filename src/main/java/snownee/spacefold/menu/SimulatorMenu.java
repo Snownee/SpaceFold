@@ -13,9 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import snownee.kiwi.network.KPacketSender;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.block.entity.SimulatorBlockEntity;
-import snownee.spacefold.dim.Plan;
 import snownee.spacefold.dim.RoomManager;
-import snownee.spacefold.dim.RoomSnapshot;
 import snownee.spacefold.dim.SimulationManager;
 import snownee.spacefold.dim.SimulationResult;
 import snownee.spacefold.network.SSimulationResultPacket;
@@ -78,16 +76,19 @@ public class SimulatorMenu extends AbstractContainerMenu {
 
 	@Override
 	public boolean clickMenuButton(Player player, int buttonId) {
+		if (!(player instanceof ServerPlayer serverPlayer)) {
+			return false;
+		}
 		boolean windows = true;
 		if (buttonId == BUTTON_TELEPORT_NO_WINDOWS) {
 			buttonId = BUTTON_TELEPORT;
 			windows = false;
 		}
-		if (buttonId == BUTTON_TELEPORT && player instanceof ServerPlayer serverPlayer) {
+		if (buttonId == BUTTON_TELEPORT) {
 			RoomManager.useSimulator(serverPlayer.level(), serverPlayer, pos, windows);
 			return true;
 		}
-		if (buttonId == BUTTON_SIMULATE && player instanceof ServerPlayer serverPlayer) {
+		if (buttonId == BUTTON_SIMULATE) {
 			RoomManager.simulate(serverPlayer.level(), serverPlayer, pos);
 			serverPlayer.closeContainer();
 			return true;

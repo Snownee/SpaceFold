@@ -37,9 +37,9 @@ public class PlanRooms extends SavedData {
 							.orElseGet(Int2ObjectOpenHashMap::new)
 							.forGetter(r -> r.snapshots))
 			.apply(i, PlanRooms::new));
-	public final Int2ObjectMap<GlobalPos> sources;
-	public final Int2ObjectMap<RoomData> rooms;
-	public final Int2ObjectMap<List<Integer>> snapshots;
+	public final Int2ObjectMap<@Nullable GlobalPos> sources;
+	public final Int2ObjectMap<@Nullable RoomData> rooms;
+	public final Int2ObjectMap<@Nullable List<Integer>> snapshots;
 	public int nextIndex;
 	public int nextSnapshotId;
 
@@ -49,10 +49,10 @@ public class PlanRooms extends SavedData {
 
 	public PlanRooms(
 			int nextIndex,
-			Int2ObjectMap<GlobalPos> sources,
-			Int2ObjectMap<RoomData> rooms,
+			Int2ObjectMap<@Nullable GlobalPos> sources,
+			Int2ObjectMap<@Nullable RoomData> rooms,
 			int nextSnapshotId,
-			Int2ObjectMap<List<Integer>> snapshots) {
+			Int2ObjectMap<@Nullable List<Integer>> snapshots) {
 		this.nextIndex = nextIndex;
 		this.sources = sources;
 		this.rooms = rooms;

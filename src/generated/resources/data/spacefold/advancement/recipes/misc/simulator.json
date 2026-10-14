@@ -1,11 +1,11 @@
 {
   "parent": "minecraft:recipes/root",
   "criteria": {
-    "has_ender_eye": {
+    "has_item": {
       "conditions": {
         "items": [
           {
-            "items": "minecraft:ender_eye"
+            "items": "minecraft:crying_obsidian"
           }
         ]
       },
@@ -21,7 +21,7 @@
   "requirements": [
     [
       "has_the_recipe",
-      "has_ender_eye"
+      "has_item"
     ]
   ],
   "rewards": {

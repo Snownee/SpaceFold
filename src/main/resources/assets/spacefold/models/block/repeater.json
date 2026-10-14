@@ -1,12 +1,25 @@
 {
-	"parent": "minecraft:block/cube",
+	"format_version": "1.21.11",
+	"credit": "Made with Blockbench",
+	"parent": "block/block",
 	"textures": {
-		"particle": "minecraft:block/budding_amethyst",
-		"down": "minecraft:block/amethyst_block",
-		"up": "minecraft:block/amethyst_block",
-		"north": "minecraft:block/budding_amethyst",
-		"east": "minecraft:block/amethyst_block",
-		"south": "minecraft:block/amethyst_block",
-		"west": "minecraft:block/amethyst_block"
-	}
+		"bottom": "spacefold:block/repeater_back",
+		"particle": "spacefold:block/repeater_side",
+		"side": "spacefold:block/repeater_side",
+		"front": "spacefold:block/repeater_front"
+	},
+	"elements": [
+		{
+			"from": [0, 0, 0],
+			"to": [16, 16, 16],
+			"faces": {
+				"north": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "north"},
+				"east": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "east"},
+				"south": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "south"},
+				"west": {"uv": [0, 0, 16, 16], "texture": "#side", "cullface": "west"},
+				"up": {"uv": [0, 0, 16, 16], "texture": "#front", "cullface": "up"},
+				"down": {"uv": [0, 0, 16, 16], "texture": "#bottom", "cullface": "down"}
+			}
+		}
+	]
 }

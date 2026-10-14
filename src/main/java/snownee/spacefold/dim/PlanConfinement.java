@@ -21,12 +21,12 @@ public final class PlanConfinement {
 	public static void init() {
 		ServerTickEvents.END_LEVEL_TICK.register(PlanConfinement::onLevelTick);
 		ServerEntityLevelChangeEvents.AFTER_PLAYER_CHANGE_LEVEL.register((player, origin, destination) -> {
-			if (!RoomManager.isRoomDimension(destination.dimension())) {
+			if (!RoomManager.isRoomDimension(destination)) {
 				LOCKS.remove(player.getUUID());
 			}
 		});
 		ServerPlayerEvents.JOIN.register(player -> {
-			if (!RoomManager.isRoomDimension(player.level().dimension())) {
+			if (!RoomManager.isRoomDimension(player.level())) {
 				LOCKS.remove(player.getUUID());
 			}
 		});
@@ -37,7 +37,7 @@ public final class PlanConfinement {
 	}
 
 	private static void onLevelTick(ServerLevel level) {
-		if (!RoomManager.isRoomDimension(level.dimension()) || !SpaceFoldConfig.confinementEnabled) {
+		if (!RoomManager.isRoomDimension(level) || !SpaceFoldConfig.confinementEnabled) {
 			return;
 		}
 		for (ServerPlayer player : level.players()) {

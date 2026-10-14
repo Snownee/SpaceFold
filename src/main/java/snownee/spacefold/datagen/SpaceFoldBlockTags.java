@@ -28,5 +28,15 @@ public class SpaceFoldBlockTags extends FabricTagsProvider.BlockTagsProvider {
 				CoreModule.CHAMBER_WINDOW.get(),
 				CoreModule.INTERFACE.get(),
 				CoreModule.INTERFACE_WINDOW.get());
+
+		valueLookupBuilder(BlockTags.MINEABLE_WITH_PICKAXE).add(
+				CoreModule.SIMULATOR.get(),
+				CoreModule.FACTORY.get(),
+				CoreModule.REPEATER.get());
+		valueLookupBuilder(BlockTags.NEEDS_DIAMOND_TOOL).add(
+				CoreModule.SIMULATOR.get(),
+				CoreModule.FACTORY.get());
+		valueLookupBuilder(BlockTags.NEEDS_IRON_TOOL).add(
+				CoreModule.REPEATER.get());
 	}
 }

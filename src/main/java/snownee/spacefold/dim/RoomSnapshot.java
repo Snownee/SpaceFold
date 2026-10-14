@@ -8,9 +8,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.jspecify.annotations.Nullable;
+
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -46,6 +50,8 @@ public class RoomSnapshot extends SavedData {
 							.forGetter(RoomSnapshot::blocks))
 			.apply(i, RoomSnapshot::new));
 
+	private static final Int2ObjectMap<SavedDataType<RoomSnapshot>> TYPES = new Int2ObjectOpenHashMap<>();
+
 	private final int room;
 	private final int size;
 	private final List<BlockState> palette;
@@ -71,13 +77,14 @@ public class RoomSnapshot extends SavedData {
 	}
 
 	public static SavedDataType<RoomSnapshot> type(int id) {
-		return new SavedDataType<>(
-				SpaceFold.id("snapshot/" + id),
-				() -> {
-					throw new IllegalStateException("Should never create an empty room snapshot");
-				},
-				CODEC,
-				DataFixTypes.LEVEL);
+		return TYPES.computeIfAbsent(
+				id, key -> new SavedDataType<>(
+						SpaceFold.id("snapshot/" + key),
+						() -> {
+							throw new IllegalStateException("Should never create an empty room snapshot");
+						},
+						CODEC,
+						DataFixTypes.LEVEL));
 	}
 
 	public static RoomSnapshot capture(Level level, int room, BlockPos origin, int size) {
@@ -92,10 +99,11 @@ public class RoomSnapshot extends SavedData {
 					if (state.isAir()) {
 						continue;
 					}
-					int index = indices.computeIfAbsent(state, s -> {
-						palette.add(s);
-						return palette.size() - 1;
-					});
+					int index = indices.computeIfAbsent(
+							state, s -> {
+								palette.add(s);
+								return palette.size() - 1;
+							});
 					blocks.add(new Entry(dx, dy, dz, index, captureBlockEntity(level, at)));
 				}
 			}
@@ -129,7 +137,6 @@ public class RoomSnapshot extends SavedData {
 		return blocks;
 	}
 
-	/** 收集方块中 tier 最高的至多十个碎片引擎的复制物品。 */
 	public List<ItemStack> topRepeaterResults(HolderLookup.Provider registries) {
 		RegistryOps<Tag> ops = registries.createSerializationContext(NbtOps.INSTANCE);
 		List<ItemStack> results = new ArrayList<>();
@@ -156,7 +163,7 @@ public class RoomSnapshot extends SavedData {
 	}
 
 	@Override
-	public boolean equals(Object obj) {
+	public boolean equals(@Nullable Object obj) {
 		if (this == obj) {
 			return true;
 		}
