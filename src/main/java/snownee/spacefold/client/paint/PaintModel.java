@@ -21,14 +21,15 @@ import net.minecraft.world.level.block.state.BlockState;
 import snownee.spacefold.block.entity.RepeaterBlockEntity;
 import snownee.spacefold.paint.FacePaint;
 import snownee.spacefold.paint.FacingRotation;
+import snownee.spacefold.paint.RepeaterPaints;
 
 public class PaintModel extends WrapperBlockStateModel {
 	public PaintModel(BlockStateModel wrapped) {
 		super(wrapped);
 	}
 
-	private static Map<Direction, FacePaint> paintsAt(BlockAndTintGetter level, BlockPos pos) {
-		return level.getBlockEntity(pos) instanceof RepeaterBlockEntity repeater ? repeater.getPaints() : Map.of();
+	private static RepeaterPaints paintsAt(BlockAndTintGetter level, BlockPos pos) {
+		return level.getBlockEntity(pos) instanceof RepeaterBlockEntity repeater ? repeater.getPaints() : RepeaterPaints.EMPTY;
 	}
 
 	@Override
@@ -39,11 +40,11 @@ public class PaintModel extends WrapperBlockStateModel {
 			BlockState state,
 			RandomSource random,
 			Predicate<@Nullable Direction> cullTest) {
-		Map<Direction, FacePaint> paints = paintsAt(level, pos);
+		RepeaterPaints paints = paintsAt(level, pos);
 		Direction facing = state.getValue(DirectionalBlock.FACING);
 		Map<Direction, TextureAtlasSprite> sprites = new EnumMap<>(Direction.class);
 		Map<Direction, FacePaint> works = new EnumMap<>(Direction.class);
-		for (Map.Entry<Direction, FacePaint> entry : paints.entrySet()) {
+		for (Map.Entry<Direction, FacePaint> entry : paints.entries()) {
 			Direction worldFace = FacingRotation.toWorld(facing, entry.getKey());
 			TextureAtlasSprite sprite = PaintAtlas.get().sprite(entry.getValue());
 			if (sprite != null) {
@@ -81,7 +82,7 @@ public class PaintModel extends WrapperBlockStateModel {
 				emitter.uv(i, PaintGeometry.u(rotation, i), PaintGeometry.v(rotation, i));
 			}
 			emitter.cullFace(worldFace);
-			emitter.materialBake(new Material.Baked(sprite, false), MutableQuadView.BAKE_NORMALIZED | rotation);
+			emitter.materialBake(new Material.Baked(sprite, false), MutableQuadView.BAKE_NORMALIZED);
 			emitter.emit();
 		}
 	}
@@ -91,6 +92,6 @@ public class PaintModel extends WrapperBlockStateModel {
 		return new GeometryKey(paintsAt(level, pos), PaintAtlas.get().version());
 	}
 
-	private record GeometryKey(Map<Direction, FacePaint> paints, int atlasVersion) {
+	private record GeometryKey(RepeaterPaints paints, int atlasVersion) {
 	}
 }

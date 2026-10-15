@@ -1,13 +1,11 @@
 package snownee.spacefold;
 
-import java.util.Map;
 import java.util.Set;
 
 import com.mojang.serialization.Codec;
 
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
-import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.registries.Registries;
@@ -44,7 +42,6 @@ import snownee.spacefold.item.OpenerItem;
 import snownee.spacefold.menu.FactoryMenu;
 import snownee.spacefold.menu.RepeaterMenu;
 import snownee.spacefold.menu.SimulatorMenu;
-import snownee.spacefold.paint.FacePaint;
 import snownee.spacefold.paint.RepeaterPaints;
 import snownee.spacefold.particle.BeamParticleOptions;
 import snownee.spacefold.particle.BeamParticleType;
@@ -107,8 +104,8 @@ public final class CoreModule extends AbstractModule {
 			() -> new MenuType<>(RepeaterMenu::new, FeatureFlags.VANILLA_SET),
 			Registries.MENU);
 	@KiwiModule.Name("repeater_paint")
-	public static final KiwiGO<DataComponentType<Map<Direction, FacePaint>>> REPEATER_PAINT = go(
-			() -> DataComponentType.<Map<Direction, FacePaint>>builder()
+	public static final KiwiGO<DataComponentType<RepeaterPaints>> REPEATER_PAINT = go(
+			() -> DataComponentType.<RepeaterPaints>builder()
 					.persistent(RepeaterPaints.CODEC)
 					.cacheEncoding()
 					.build(),

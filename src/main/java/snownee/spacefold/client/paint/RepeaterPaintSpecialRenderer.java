@@ -19,6 +19,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.item.ItemStack;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.paint.FacePaint;
+import snownee.spacefold.paint.RepeaterPaints;
 
 public class RepeaterPaintSpecialRenderer implements SpecialModelRenderer<RepeaterPaintSpecialRenderer.Argument> {
 	private static void submitFace(
@@ -73,7 +74,7 @@ public class RepeaterPaintSpecialRenderer implements SpecialModelRenderer<Repeat
 
 	@Override
 	public @Nullable Argument extractArgument(ItemStack stack) {
-		Map<Direction, FacePaint> paints = stack.get(CoreModule.REPEATER_PAINT.get());
+		RepeaterPaints paints = stack.get(CoreModule.REPEATER_PAINT.get());
 		if (paints == null || paints.isEmpty()) {
 			return null;
 		}
@@ -92,7 +93,7 @@ public class RepeaterPaintSpecialRenderer implements SpecialModelRenderer<Repeat
 		if (argument == null) {
 			return;
 		}
-		for (Map.Entry<Direction, FacePaint> entry : argument.paints().entrySet()) {
+		for (Map.Entry<Direction, FacePaint> entry : argument.paints().entries()) {
 			Direction face = entry.getKey();
 			FacePaint paint = entry.getValue();
 			TextureAtlasSprite sprite = PaintAtlas.get().sprite(paint);
@@ -113,7 +114,7 @@ public class RepeaterPaintSpecialRenderer implements SpecialModelRenderer<Repeat
 		}
 	}
 
-	public record Argument(Map<Direction, FacePaint> paints, int atlasVersion) {
+	public record Argument(RepeaterPaints paints, int atlasVersion) {
 	}
 
 	public static final class Unbaked implements SpecialModelRenderer.Unbaked<Argument> {

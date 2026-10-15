@@ -3,7 +3,6 @@ package snownee.spacefold.block.entity;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Predicate;
 
 import org.jspecify.annotations.Nullable;
@@ -41,7 +40,6 @@ import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFoldConfig;
 import snownee.spacefold.dim.SimulationResult;
 import snownee.spacefold.network.SViewDetailsPacket;
-import snownee.spacefold.paint.FacePaint;
 import snownee.spacefold.paint.RepeaterPaints;
 import snownee.spacefold.particle.BeamParticleOptions;
 import team.reborn.energy.api.EnergyStorage;
@@ -78,8 +76,8 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 		super(CoreModule.FACTORY_BE.get(), pos, state);
 	}
 
-	private static Map<Direction, FacePaint> paintsOf(ItemStack stack) {
-		Map<Direction, FacePaint> paints = stack.get(CoreModule.REPEATER_PAINT.get());
+	private static RepeaterPaints paintsOf(ItemStack stack) {
+		RepeaterPaints paints = stack.get(CoreModule.REPEATER_PAINT.get());
 		return paints == null ? RepeaterPaints.EMPTY : paints;
 	}
 
@@ -388,7 +386,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 		if (name != null) {
 			made.set(DataComponents.CUSTOM_NAME, name);
 		}
-		Map<Direction, FacePaint> paints = paintsOf(item);
+		RepeaterPaints paints = paintsOf(item);
 		if (!paints.isEmpty()) {
 			made.set(CoreModule.REPEATER_PAINT.get(), paints);
 		}

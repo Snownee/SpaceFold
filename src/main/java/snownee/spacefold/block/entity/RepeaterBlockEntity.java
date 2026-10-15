@@ -64,7 +64,7 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 	private double energyOutput;
 	private @Nullable SimulationResult result;
 	private @Nullable Component name;
-	private volatile Map<Direction, FacePaint> paints = RepeaterPaints.EMPTY;
+	private volatile RepeaterPaints paints = RepeaterPaints.EMPTY;
 	private double throttle;
 	private int secondTicks;
 	private boolean secondSatisfied = true;
@@ -132,23 +132,20 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 		setChanged();
 	}
 
-	public Map<Direction, FacePaint> getPaints() {
+	public RepeaterPaints getPaints() {
 		return paints;
 	}
 
-	public void setPaints(Map<Direction, FacePaint> paints) {
-		Map<Direction, FacePaint> updated = RepeaterPaints.copy(paints);
+	public void setPaints(RepeaterPaints paints) {
 		synchronized (paintsLock) {
-			this.paints = updated;
+			this.paints = paints;
 		}
 		onPaintsChanged();
 	}
 
-	public void setPaint(Direction face, FacePaint paint) {
-		Map<Direction, FacePaint> updated;
+	public void setPaint(Direction face, @Nullable FacePaint paint) {
 		synchronized (paintsLock) {
-			updated = RepeaterPaints.set(paints, face, paint);
-			paints = updated;
+			paints = paints.set(face, paint);
 		}
 		onPaintsChanged();
 	}

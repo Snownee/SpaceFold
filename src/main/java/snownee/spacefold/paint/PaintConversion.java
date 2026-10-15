@@ -1,5 +1,7 @@
 package snownee.spacefold.paint;
 
+import org.jspecify.annotations.Nullable;
+
 import net.fabricmc.fabric.api.event.player.UseEntityCallback;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -48,13 +50,16 @@ public final class PaintConversion {
 		if (!(state.getBlock() instanceof RepeaterBlock) || !(level.getBlockEntity(supportPos) instanceof RepeaterBlockEntity repeater)) {
 			return InteractionResult.PASS;
 		}
-		repeater.setPaint(FacingRotation.toModel(state.getValue(DirectionalBlock.FACING), face), paint);
+		Direction facing = state.getValue(DirectionalBlock.FACING);
+		repeater.setPaint(
+				FacingRotation.toModel(facing, face),
+				new FacePaint(paint.pixels(), paint.rotation() + FacingRotation.rotationOffset(facing, face)));
 		canvas.discard();
 		level.playSound(null, supportPos, SoundEvents.PAINTING_PLACE, SoundSource.BLOCKS, 1.0F, 1.0F);
 		return InteractionResult.SUCCESS;
 	}
 
-	private static FacePaint facePaint(EntityCanvas canvas) {
+	private static @Nullable FacePaint facePaint(EntityCanvas canvas) {
 		EntityCanvas.Picture picture = EntityCanvas.PICTURES.get(canvas.getCanvasID());
 		if (picture == null) {
 			return null;

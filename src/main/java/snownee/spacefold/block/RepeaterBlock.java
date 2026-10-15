@@ -1,7 +1,6 @@
 package snownee.spacefold.block;
 
 import java.util.List;
-import java.util.Map;
 
 import org.jspecify.annotations.Nullable;
 
@@ -10,14 +9,21 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.resources.RegistryOps;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
@@ -32,11 +38,12 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.storage.loot.LootParams;
 import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.phys.BlockHitResult;
 import snownee.kiwi.block.IKiwiBlock;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.block.entity.RepeaterBlockEntity;
 import snownee.spacefold.dim.SimulationResult;
-import snownee.spacefold.paint.FacePaint;
+import snownee.spacefold.paint.FacingRotation;
 import snownee.spacefold.paint.RepeaterPaints;
 
 public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiwiBlock {
@@ -56,7 +63,7 @@ public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiw
 		if (result != null) {
 			stack.set(CoreModule.SIMULATION_RESULT.get(), result);
 		}
-		Map<Direction, FacePaint> paints = blockEntity.getPaints();
+		RepeaterPaints paints = blockEntity.getPaints();
 		if (!paints.isEmpty()) {
 			stack.set(CoreModule.REPEATER_PAINT.get(), paints);
 		}
@@ -117,6 +124,41 @@ public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiw
 	}
 
 	@Override
+	protected InteractionResult useItemOn(
+			ItemStack itemStack,
+			BlockState state,
+			Level level,
+			BlockPos pos,
+			Player player,
+			InteractionHand hand,
+			BlockHitResult hitResult) {
+		if (!itemStack.is(Items.WET_SPONGE) || !(level.getBlockEntity(pos) instanceof RepeaterBlockEntity repeater)) {
+			return super.useItemOn(itemStack, state, level, pos, player, hand, hitResult);
+		}
+		Direction modelFace = FacingRotation.toModel(state.getValue(FACING), hitResult.getDirection());
+		if (repeater.getPaints().get(modelFace) == null) {
+			return super.useItemOn(itemStack, state, level, pos, player, hand, hitResult);
+		}
+		if (!level.isClientSide()) {
+			repeater.setPaint(modelFace, null);
+			Direction clickedFace = hitResult.getDirection();
+			Direction.Axis axis = clickedFace.getAxis();
+			((ServerLevel) level).sendParticles(
+					ParticleTypes.FALLING_WATER,
+					pos.getX() + 0.5 + clickedFace.getStepX() * 0.55,
+					pos.getY() + 0.5 + clickedFace.getStepY() * 0.55,
+					pos.getZ() + 0.5 + clickedFace.getStepZ() * 0.55,
+					12,
+					axis == Direction.Axis.X ? 0.0 : 0.4,
+					axis == Direction.Axis.Y ? 0.0 : 0.4,
+					axis == Direction.Axis.Z ? 0.0 : 0.4,
+					0.0);
+			level.playSound(null, pos, SoundEvents.SPONGE_ABSORB, SoundSource.BLOCKS, 1.0F, 1.0F);
+		}
+		return InteractionResult.SUCCESS;
+	}
+
+	@Override
 	public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
 		super.setPlacedBy(level, pos, state, placer, stack);
 		if (level.isClientSide()) {
@@ -129,7 +171,7 @@ public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiw
 		if (result != null) {
 			blockEntity.setResult(result);
 		}
-		Map<Direction, FacePaint> paints = stack.get(CoreModule.REPEATER_PAINT.get());
+		RepeaterPaints paints = stack.get(CoreModule.REPEATER_PAINT.get());
 		if (paints != null && !paints.isEmpty()) {
 			blockEntity.setPaints(paints);
 		}
