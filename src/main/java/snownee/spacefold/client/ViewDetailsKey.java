@@ -10,11 +10,13 @@ import net.minecraft.util.Util;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.jspecify.annotations.Nullable;
+import snownee.kiwi.network.KPacketSender;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
 import snownee.spacefold.block.entity.FactoryBlockEntity;
 import snownee.spacefold.menu.FactoryMenu;
 import snownee.spacefold.menu.RepeaterMenu;
+import snownee.spacefold.network.CRepeaterConfigPacket;
 import snownee.spacefold.network.SViewDetailsPacket;
 
 public final class ViewDetailsKey {
@@ -63,17 +65,28 @@ public final class ViewDetailsKey {
 			return;
 		}
 		ItemStack stack = hoveredSlot == null ? ItemStack.EMPTY : hoveredSlot.getItem();
-		if (stack.isEmpty() || !stack.has(CoreModule.SIMULATION_RESULT.get())) {
+		if (stack.isEmpty()) {
 			holdStart = -1;
 			return;
 		}
-		if (consumeHold()) {
-			int configSlot = -1;
-			if (minecraft.player != null && hoveredSlot != null
-					&& hoveredSlot.container == minecraft.player.getInventory()
-					&& RepeaterMenu.canConfigure(minecraft.player, stack)) {
-				configSlot = hoveredSlot.getContainerSlot();
+		boolean inPlayerInventory = hoveredSlot != null
+				&& minecraft.player != null
+				&& hoveredSlot.container == minecraft.player.getInventory();
+		if (!stack.has(CoreModule.SIMULATION_RESULT.get())) {
+			if (!inPlayerInventory || !canConfigure(stack)) {
+				holdStart = -1;
+				return;
 			}
+			if (consumeHold()) {
+				minecraft.player.closeContainer();
+				KPacketSender.sendToServer(new CRepeaterConfigPacket(hoveredSlot.getContainerSlot()));
+			}
+			return;
+		}
+		if (consumeHold()) {
+			int configSlot = inPlayerInventory && RepeaterMenu.canConfigure(minecraft.player, stack)
+					? hoveredSlot.getContainerSlot()
+					: -1;
 			minecraft.player.closeContainer();
 			minecraft.setScreen(new DetailsScreen(
 					SViewDetailsPacket.entriesFrom(stack),
@@ -82,6 +95,13 @@ public final class ViewDetailsKey {
 					configSlot,
 					stack));
 		}
+	}
+
+	public static boolean canConfigure(ItemStack stack) {
+		Minecraft minecraft = Minecraft.getInstance();
+		return minecraft.player != null
+				&& FactoryBlockEntity.isTemplateStack(stack)
+				&& RepeaterMenu.canConfigure(minecraft.player, stack);
 	}
 
 	private static boolean consumeHold() {

@@ -1,0 +1,10 @@
+{
+	"variants": {
+		"powered=false": {
+			"model": "spacefold:block/simulation_redstone_off"
+		},
+		"powered=true": {
+			"model": "spacefold:block/simulation_redstone"
+		}
+	}
+}

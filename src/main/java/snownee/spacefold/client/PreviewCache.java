@@ -8,8 +8,7 @@ import org.jspecify.annotations.Nullable;
 
 import it.unimi.dsi.fastutil.ints.Int2FloatMap;
 import it.unimi.dsi.fastutil.ints.Int2FloatOpenHashMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.ints.IntSet;
 import net.minecraft.util.Mth;
@@ -22,7 +21,7 @@ import snownee.spacefold.network.CSnapshotRequestPacket;
 public final class PreviewCache {
 	public static final float DEFAULT_YAW = 45.0F;
 
-	private static final Int2ObjectMap<@Nullable RoomSnapshot> snapshots = new Int2ObjectOpenHashMap<>();
+	private static final Int2ObjectLinkedOpenHashMap<@Nullable RoomSnapshot> snapshots = new Int2ObjectLinkedOpenHashMap<>();
 	private static final IntSet pendingSnapshots = new IntOpenHashSet();
 	private static String snapshotYaws = "";
 	private static Int2FloatMap parsedYaws = new Int2FloatOpenHashMap();
@@ -57,6 +56,18 @@ public final class PreviewCache {
 			snapshots.put(id, snapshot);
 			structureVersion++;
 			if (RoomSnapshot.isPreviewId(id)) {
+				version++;
+			}
+			trim();
+		}
+	}
+
+	private static void trim() {
+		while (snapshots.size() > SpaceFoldClientConfig.previewCacheLimit) {
+			int evicted = snapshots.firstIntKey();
+			snapshots.removeFirst();
+			structureVersion++;
+			if (RoomSnapshot.isPreviewId(evicted)) {
 				version++;
 			}
 		}

@@ -1,15 +1,16 @@
 package snownee.spacefold.dim;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleMaps;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
+import snownee.spacefold.util.Object2DoubleCodec;
 
 public record SimulationResult(
 		Rates inputs,
@@ -65,54 +66,22 @@ public record SimulationResult(
 				.apply(i, Material::new));
 	}
 
-	public record Rates(Map<ItemVariant, Double> items, Map<FluidVariant, Double> fluids, double energy) {
-		public static final Rates EMPTY = new Rates(Map.of(), Map.of(), 0);
+	public record Rates(Object2DoubleMap<ItemVariant> items, Object2DoubleMap<FluidVariant> fluids, double energy) {
+		public static final Codec<Object2DoubleMap<ItemVariant>> ITEM_AMOUNTS_CODEC = Object2DoubleCodec.of(ItemVariant.CODEC, "item", "rate");
+		public static final Codec<Object2DoubleMap<FluidVariant>> FLUID_AMOUNTS_CODEC = Object2DoubleCodec.of(FluidVariant.CODEC, "fluid", "rate");
+		public static final Rates EMPTY = new Rates(Object2DoubleMaps.emptyMap(), Object2DoubleMaps.emptyMap(), 0);
 		public static final Codec<Rates> CODEC = RecordCodecBuilder.create(i -> i.group(
-						ItemRate.CODEC.listOf()
-								.optionalFieldOf("items", List.of())
-								.forGetter(Rates::itemList),
-						FluidRate.CODEC.listOf()
-								.optionalFieldOf("fluids", List.of())
-								.forGetter(Rates::fluidList),
+						ITEM_AMOUNTS_CODEC
+								.optionalFieldOf("items", Object2DoubleMaps.emptyMap())
+								.forGetter(Rates::items),
+						FLUID_AMOUNTS_CODEC
+								.optionalFieldOf("fluids", Object2DoubleMaps.emptyMap())
+								.forGetter(Rates::fluids),
 						Codec.DOUBLE.optionalFieldOf("energy", 0.0).forGetter(Rates::energy))
-				.apply(i, Rates::fromLists));
-
-		private static Rates fromLists(List<ItemRate> items, List<FluidRate> fluids, double energy) {
-			Map<ItemVariant, Double> itemRates = new LinkedHashMap<>();
-			for (ItemRate rate : items) {
-				itemRates.put(rate.item(), rate.rate());
-			}
-			Map<FluidVariant, Double> fluidRates = new LinkedHashMap<>();
-			for (FluidRate rate : fluids) {
-				fluidRates.put(rate.fluid(), rate.rate());
-			}
-			return new Rates(itemRates, fluidRates, energy);
-		}
+				.apply(i, Rates::new));
 
 		public int kindCount() {
 			return items.size() + fluids.size() + (energy > 0 ? 1 : 0);
-		}
-
-		private List<ItemRate> itemList() {
-			return items.entrySet().stream().map(entry -> new ItemRate(entry.getKey(), entry.getValue())).toList();
-		}
-
-		private List<FluidRate> fluidList() {
-			return fluids.entrySet().stream().map(entry -> new FluidRate(entry.getKey(), entry.getValue())).toList();
-		}
-
-		private record ItemRate(ItemVariant item, double rate) {
-			static final Codec<ItemRate> CODEC = RecordCodecBuilder.create(i -> i.group(
-							ItemVariant.CODEC.fieldOf("item").forGetter(ItemRate::item),
-							Codec.DOUBLE.fieldOf("rate").forGetter(ItemRate::rate))
-					.apply(i, ItemRate::new));
-		}
-
-		private record FluidRate(FluidVariant fluid, double rate) {
-			static final Codec<FluidRate> CODEC = RecordCodecBuilder.create(i -> i.group(
-							FluidVariant.CODEC.fieldOf("fluid").forGetter(FluidRate::fluid),
-							Codec.DOUBLE.fieldOf("rate").forGetter(FluidRate::rate))
-					.apply(i, FluidRate::new));
 		}
 	}
 }

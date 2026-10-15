@@ -9,9 +9,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.ObjIntConsumer;
+import java.util.function.Predicate;
 
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -20,6 +24,7 @@ import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.fabricmc.fabric.api.transfer.v1.transaction.TransactionContext;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
@@ -28,23 +33,15 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
+import net.minecraft.world.entity.ai.village.poi.PoiManager;
+import net.minecraft.world.entity.ai.village.poi.PoiType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.CandleBlock;
-import net.minecraft.world.level.block.SeaPickleBlock;
-import net.minecraft.world.level.block.SnowLayerBlock;
-import net.minecraft.world.level.block.TurtleEggBlock;
 import net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.SlabType;
-import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
@@ -53,7 +50,7 @@ import snownee.kiwi.network.KPacketSender;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFoldConfig;
 import snownee.spacefold.block.InterfaceBlock;
-import snownee.spacefold.block.RepeaterBlock;
+import snownee.spacefold.block.SimulationRedstoneBlock;
 import snownee.spacefold.block.entity.RepeaterBlockEntity;
 import snownee.spacefold.network.SSimulationRatesPacket;
 import snownee.spacefold.network.SSimulationRatesPacket.Entry;
@@ -63,7 +60,8 @@ public final class SimulationManager {
 	private static final int ENTITY_TICKING_RADIUS = 2;
 	private static final int UPDATE_INTERVAL = 10;
 	private static final int SECTION_LINES = 5;
-	private static final double WARMUP_FRACTION = 0.4;
+	private static final double WARMUP_FRACTION = 0.25;
+	private static final double TRAILING_FRACTION = 0.25;
 
 	private static final Map<Integer, Session> ACTIVE = new HashMap<>();
 
@@ -135,7 +133,8 @@ public final class SimulationManager {
 				collectInterfaces(simulate, room),
 				new Resources(),
 				new Resources(),
-				new Warmup());
+				new Warmup(),
+				new Counted());
 		Session previous = ACTIVE.put(room, session);
 		if (previous != null) {
 			setChunksLoaded(simulate.getServer(), previous, false);
@@ -156,7 +155,7 @@ public final class SimulationManager {
 		Session session = ACTIVE.get(room);
 		transaction.addOuterCloseCallback(result -> {
 			if (result.wasCommitted()) {
-				ensureWarmup(session);
+				advancePhases(session);
 				session.inputs().items.mergeLong(resource, amount, Long::sum);
 			}
 		});
@@ -166,7 +165,7 @@ public final class SimulationManager {
 		Session session = ACTIVE.get(room);
 		transaction.addOuterCloseCallback(result -> {
 			if (result.wasCommitted()) {
-				ensureWarmup(session);
+				advancePhases(session);
 				session.inputs().fluids.mergeLong(resource, amount, Long::sum);
 			}
 		});
@@ -176,7 +175,7 @@ public final class SimulationManager {
 		Session session = ACTIVE.get(room);
 		transaction.addOuterCloseCallback(result -> {
 			if (result.wasCommitted()) {
-				ensureWarmup(session);
+				advancePhases(session);
 				session.inputs().energy += amount;
 			}
 		});
@@ -186,7 +185,7 @@ public final class SimulationManager {
 		Session session = ACTIVE.get(room);
 		transaction.addOuterCloseCallback(result -> {
 			if (result.wasCommitted()) {
-				ensureWarmup(session);
+				advancePhases(session);
 				session.outputs().items.mergeLong(resource, amount, Long::sum);
 			}
 		});
@@ -196,7 +195,7 @@ public final class SimulationManager {
 		Session session = ACTIVE.get(room);
 		transaction.addOuterCloseCallback(result -> {
 			if (result.wasCommitted()) {
-				ensureWarmup(session);
+				advancePhases(session);
 				session.outputs().fluids.mergeLong(resource, amount, Long::sum);
 			}
 		});
@@ -206,7 +205,7 @@ public final class SimulationManager {
 		Session session = ACTIVE.get(room);
 		transaction.addOuterCloseCallback(result -> {
 			if (result.wasCommitted()) {
-				ensureWarmup(session);
+				advancePhases(session);
 				session.outputs().energy += amount;
 			}
 		});
@@ -214,6 +213,15 @@ public final class SimulationManager {
 
 	private static boolean counting(Session session) {
 		return session.level().getGameTime() - session.startTime() > warmupTicks(session);
+	}
+
+	private static boolean trailing(Session session) {
+		return session.level().getGameTime() >= session.endTime() - trailingTicks(session);
+	}
+
+	private static void advancePhases(Session session) {
+		ensureWarmup(session);
+		ensureCounted(session);
 	}
 
 	private static void ensureWarmup(Session session) {
@@ -229,14 +237,60 @@ public final class SimulationManager {
 		}
 		session.inputs().reset();
 		session.outputs().reset();
+		setRedstones(session, true);
+	}
+
+	private static void ensureCounted(Session session) {
+		Counted counted = session.counted();
+		if (counted.done || !trailing(session)) {
+			return;
+		}
+		counted.done = true;
+		counted.inputs = session.inputs().copy();
+		counted.outputs = session.outputs().copy();
+		session.inputs().reset();
+		session.outputs().reset();
+		setRedstones(session, false);
+	}
+
+	private static void setRedstones(Session session, boolean powered) {
+		ServerLevel level = session.level();
+		BlockPos origin = RoomManager.roomOrigin(session.room());
+		int size = SpaceFoldConfig.roomSize;
+		BlockPos center = origin.offset(size / 2, size / 2, size / 2);
+		Predicate<Holder<PoiType>> predicate = holder -> CoreModule.SIMULATION_REDSTONE_POI.is(holder.value());
+		Block block = CoreModule.SIMULATION_REDSTONE.get();
+		level.getPoiManager()
+				.findAll(predicate, pos -> insideRoom(origin, pos, size), center, size, PoiManager.Occupancy.ANY)
+				.forEach(pos -> {
+					BlockState state = level.getBlockState(pos);
+					if (state.is(block) && state.getValue(SimulationRedstoneBlock.POWERED) != powered) {
+						level.setBlock(pos, state.setValue(SimulationRedstoneBlock.POWERED, powered), Block.UPDATE_ALL);
+					}
+				});
+	}
+
+	private static boolean insideRoom(BlockPos origin, BlockPos pos, int size) {
+		int lx = pos.getX() - origin.getX();
+		int ly = pos.getY() - origin.getY();
+		int lz = pos.getZ() - origin.getZ();
+		return lx >= 0 && lx < size && ly >= 0 && ly < size && lz >= 0 && lz < size;
 	}
 
 	private static long warmupTicks(Session session) {
 		return (long) ((session.endTime() - session.startTime()) * WARMUP_FRACTION);
 	}
 
+	private static long trailingTicks(Session session) {
+		return (long) ((session.endTime() - session.startTime()) * TRAILING_FRACTION);
+	}
+
+	private static long countedTicks(Session session) {
+		return session.endTime() - session.startTime() - warmupTicks(session) - trailingTicks(session);
+	}
+
 	private static double countedSeconds(Session session) {
-		return (session.endTime() - session.startTime() - warmupTicks(session)) / 20.0;
+		return countedTicks(session) / 20.0;
 	}
 
 	public static @Nullable BlockPos interfaceTarget(ResourceKey<Level> dim, BlockPos pos, Direction side) {
@@ -277,6 +331,7 @@ public final class SimulationManager {
 		Iterator<Map.Entry<Integer, Session>> iterator = ACTIVE.entrySet().iterator();
 		while (iterator.hasNext()) {
 			Map.Entry<Integer, Session> entry = iterator.next();
+			advancePhases(entry.getValue());
 			if (now >= entry.getValue().endTime()) {
 				iterator.remove();
 				end(server, simulate, entry.getKey(), entry.getValue());
@@ -326,18 +381,25 @@ public final class SimulationManager {
 	}
 
 	private static SSimulationRatesPacket packet(Session session, long now) {
-		ensureWarmup(session);
+		advancePhases(session);
 		long duration = session.endTime() - session.startTime();
 		int total = (int) duration;
 		int remaining = (int) Math.max(0L, session.endTime() - now);
 		int progress = total <= 0 ? 100 : (int) Math.round((total - remaining) * 100.0 / total);
 		double elapsed = (total - remaining) / 20.0;
-		long warmupTickCount = warmupTicks(session);
-		if (elapsed <= warmupTickCount / 20.0) {
+		double warmupSeconds = warmupTicks(session) / 20.0;
+		if (elapsed <= warmupSeconds) {
 			return new SSimulationRatesPacket(progress, section(session.inputs(), elapsed), section(session.outputs(), elapsed));
 		}
-		double countedElapsed = elapsed - warmupTickCount / 20.0;
-		double countedDuration = (total - warmupTickCount) / 20.0;
+		double countedDuration = countedTicks(session) / 20.0;
+		Counted counted = session.counted();
+		if (counted.done) {
+			return new SSimulationRatesPacket(
+					progress,
+					section(counted.inputs, countedDuration),
+					section(counted.outputs, countedDuration));
+		}
+		double countedElapsed = Math.min(countedDuration, elapsed - warmupSeconds);
 		double p = countedDuration <= 0 ? 1.0 : Math.min(1.0, countedElapsed / countedDuration);
 		Warmup warmup = session.warmup();
 		return new SSimulationRatesPacket(
@@ -365,15 +427,15 @@ public final class SimulationManager {
 	private static Section blend(SimulationResult.Rates warmup, Resources resources, double elapsed, double p) {
 		double divisor = elapsed;
 		Map<ItemVariant, Double> items = new LinkedHashMap<>();
-		for (Map.Entry<ItemVariant, Double> entry : warmup.items().entrySet()) {
-			items.merge(entry.getKey(), entry.getValue() * (1.0 - p), Double::sum);
+		for (Object2DoubleMap.Entry<ItemVariant> entry : warmup.items().object2DoubleEntrySet()) {
+			items.merge(entry.getKey(), entry.getDoubleValue() * (1.0 - p), Double::sum);
 		}
 		for (Object2LongMap.Entry<ItemVariant> entry : resources.items.object2LongEntrySet()) {
 			items.merge(entry.getKey(), entry.getLongValue() / divisor * p, Double::sum);
 		}
 		Map<FluidVariant, Double> fluids = new LinkedHashMap<>();
-		for (Map.Entry<FluidVariant, Double> entry : warmup.fluids().entrySet()) {
-			fluids.merge(entry.getKey(), entry.getValue() * (1.0 - p), Double::sum);
+		for (Object2DoubleMap.Entry<FluidVariant> entry : warmup.fluids().object2DoubleEntrySet()) {
+			fluids.merge(entry.getKey(), entry.getDoubleValue() * (1.0 - p), Double::sum);
 		}
 		for (Object2LongMap.Entry<FluidVariant> entry : resources.fluids.object2LongEntrySet()) {
 			fluids.merge(entry.getKey(), entry.getLongValue() / divisor * p, Double::sum);
@@ -461,37 +523,40 @@ public final class SimulationManager {
 	}
 
 	private static SimulationResult result(Session session, boolean blocksChanged, int tier) {
-		ensureWarmup(session);
+		advancePhases(session);
 		double seconds = countedSeconds(session);
-		SimulationResult.Rates rawInputs = rateSet(session.inputs(), seconds);
-		SimulationResult.Rates rawOutputs = rateSet(session.outputs(), seconds);
+		Counted counted = session.counted();
+		SimulationResult.Rates rawInputs = rateSet(counted.done ? counted.inputs : session.inputs(), seconds);
+		SimulationResult.Rates rawOutputs = rateSet(counted.done ? counted.outputs : session.outputs(), seconds);
 
-		Map<ItemVariant, Double> items = new LinkedHashMap<>(rawOutputs.items());
-		for (Map.Entry<ItemVariant, Double> entry : rawInputs.items().entrySet()) {
-			items.merge(entry.getKey(), -entry.getValue(), Double::sum);
+		Object2DoubleMap<ItemVariant> items = new Object2DoubleLinkedOpenHashMap<>(rawOutputs.items());
+		for (Object2DoubleMap.Entry<ItemVariant> entry : rawInputs.items().object2DoubleEntrySet()) {
+			items.mergeDouble(entry.getKey(), -entry.getDoubleValue(), Double::sum);
 		}
-		Map<FluidVariant, Double> fluids = new LinkedHashMap<>(rawOutputs.fluids());
-		for (Map.Entry<FluidVariant, Double> entry : rawInputs.fluids().entrySet()) {
-			fluids.merge(entry.getKey(), -entry.getValue(), Double::sum);
+		Object2DoubleMap<FluidVariant> fluids = new Object2DoubleLinkedOpenHashMap<>(rawOutputs.fluids());
+		for (Object2DoubleMap.Entry<FluidVariant> entry : rawInputs.fluids().object2DoubleEntrySet()) {
+			fluids.mergeDouble(entry.getKey(), -entry.getDoubleValue(), Double::sum);
 		}
 		double energy = rawOutputs.energy() - rawInputs.energy();
 
-		Map<ItemVariant, Double> inputItems = new LinkedHashMap<>();
-		Map<ItemVariant, Double> outputItems = new LinkedHashMap<>();
-		for (Map.Entry<ItemVariant, Double> entry : items.entrySet()) {
-			if (entry.getValue() > 1.0E-9) {
-				outputItems.put(entry.getKey(), entry.getValue());
-			} else if (entry.getValue() < -1.0E-9) {
-				inputItems.put(entry.getKey(), -entry.getValue());
+		Object2DoubleMap<ItemVariant> inputItems = new Object2DoubleLinkedOpenHashMap<>();
+		Object2DoubleMap<ItemVariant> outputItems = new Object2DoubleLinkedOpenHashMap<>();
+		for (Object2DoubleMap.Entry<ItemVariant> entry : items.object2DoubleEntrySet()) {
+			double value = entry.getDoubleValue();
+			if (value > 1.0E-9) {
+				outputItems.put(entry.getKey(), value);
+			} else if (value < -1.0E-9) {
+				inputItems.put(entry.getKey(), -value);
 			}
 		}
-		Map<FluidVariant, Double> inputFluids = new LinkedHashMap<>();
-		Map<FluidVariant, Double> outputFluids = new LinkedHashMap<>();
-		for (Map.Entry<FluidVariant, Double> entry : fluids.entrySet()) {
-			if (entry.getValue() > 1.0E-9) {
-				outputFluids.put(entry.getKey(), entry.getValue());
-			} else if (entry.getValue() < -1.0E-9) {
-				inputFluids.put(entry.getKey(), -entry.getValue());
+		Object2DoubleMap<FluidVariant> inputFluids = new Object2DoubleLinkedOpenHashMap<>();
+		Object2DoubleMap<FluidVariant> outputFluids = new Object2DoubleLinkedOpenHashMap<>();
+		for (Object2DoubleMap.Entry<FluidVariant> entry : fluids.object2DoubleEntrySet()) {
+			double value = entry.getDoubleValue();
+			if (value > 1.0E-9) {
+				outputFluids.put(entry.getKey(), value);
+			} else if (value < -1.0E-9) {
+				inputFluids.put(entry.getKey(), -value);
 			}
 		}
 		SimulationResult.Rates inputs = new SimulationResult.Rates(inputItems, inputFluids, Math.max(0, -energy));
@@ -558,11 +623,12 @@ public final class SimulationManager {
 	static List<SimulationResult.Material> materials(ServerLevel level, int room) {
 		BlockPos origin = RoomManager.roomOrigin(room);
 		Map<ItemVariant, Integer> counts = new LinkedHashMap<>();
+		ObjIntConsumer<ItemVariant> sink = (variant, count) -> counts.merge(variant, count, Integer::sum);
 		for (int dx = 1; dx < SpaceFoldConfig.roomSize - 1; dx++) {
 			for (int dy = 1; dy < SpaceFoldConfig.roomSize - 1; dy++) {
 				for (int dz = 1; dz < SpaceFoldConfig.roomSize - 1; dz++) {
 					BlockPos at = origin.offset(dx, dy, dz);
-					collectMaterial(level, at, materialState(level, at), counts);
+					BlockMaterials.collect(level, at, materialState(level, at), sink);
 				}
 			}
 		}
@@ -582,55 +648,13 @@ public final class SimulationManager {
 		return state;
 	}
 
-	private static void collectMaterial(ServerLevel level, BlockPos pos, BlockState state, Map<ItemVariant, Integer> counts) {
-		if (state.isAir()) {
-			return;
-		}
-		Block block = state.getBlock();
-		if (block == CoreModule.SIMULATOR.get()) {
-			return;
-		}
-		Item item = block.asItem();
-		if (item == Items.AIR) {
-			FluidState fluid = state.getFluidState();
-			if (fluid.isSource()) {
-				Item bucket = fluid.getType().getBucket();
-				if (bucket != Items.AIR) {
-					counts.merge(ItemVariant.of(new ItemStack(bucket)), 1, Integer::sum);
-				}
-			}
-			return;
-		}
-		ItemStack stack = block instanceof RepeaterBlock ? state.getCloneItemStack(level, pos, true) : new ItemStack(item);
-		counts.merge(ItemVariant.of(stack), materialAmount(block, state), Integer::sum);
-	}
-
-	private static int materialAmount(Block block, BlockState state) {
-		if (state.hasProperty(BlockStateProperties.SLAB_TYPE) && state.getValue(BlockStateProperties.SLAB_TYPE) == SlabType.DOUBLE) {
-			return 2;
-		}
-		if (block instanceof CandleBlock) {
-			return state.getValue(BlockStateProperties.CANDLES);
-		}
-		if (block instanceof TurtleEggBlock) {
-			return state.getValue(BlockStateProperties.EGGS);
-		}
-		if (block instanceof SeaPickleBlock) {
-			return state.getValue(BlockStateProperties.PICKLES);
-		}
-		if (block instanceof SnowLayerBlock) {
-			return state.getValue(BlockStateProperties.LAYERS);
-		}
-		return 1;
-	}
-
 	private static SimulationResult.Rates rateSet(Resources resources, double seconds) {
 		double divisor = seconds;
-		Map<ItemVariant, Double> items = new LinkedHashMap<>();
+		Object2DoubleMap<ItemVariant> items = new Object2DoubleLinkedOpenHashMap<>();
 		for (Object2LongMap.Entry<ItemVariant> entry : resources.items.object2LongEntrySet()) {
 			items.put(entry.getKey(), entry.getLongValue() / divisor);
 		}
-		Map<FluidVariant, Double> fluids = new LinkedHashMap<>();
+		Object2DoubleMap<FluidVariant> fluids = new Object2DoubleLinkedOpenHashMap<>();
 		for (Object2LongMap.Entry<FluidVariant> entry : resources.fluids.object2LongEntrySet()) {
 			fluids.put(entry.getKey(), entry.getLongValue() / divisor);
 		}
@@ -709,7 +733,8 @@ public final class SimulationManager {
 			BlockPos[] targets,
 			Resources inputs,
 			Resources outputs,
-			Warmup warmup) {}
+			Warmup warmup,
+			Counted counted) {}
 
 	public enum RoomStatus {
 		READY,
@@ -723,6 +748,12 @@ public final class SimulationManager {
 		private SimulationResult.Rates outputs = SimulationResult.Rates.EMPTY;
 	}
 
+	private static final class Counted {
+		private boolean done;
+		private Resources inputs = new Resources();
+		private Resources outputs = new Resources();
+	}
+
 	private static final class Resources {
 		private final Object2LongMap<ItemVariant> items = new Object2LongOpenHashMap<>();
 		private final Object2LongMap<FluidVariant> fluids = new Object2LongOpenHashMap<>();
@@ -732,6 +763,14 @@ public final class SimulationManager {
 			items.clear();
 			fluids.clear();
 			energy = 0;
+		}
+
+		private Resources copy() {
+			Resources copy = new Resources();
+			copy.items.putAll(items);
+			copy.fluids.putAll(fluids);
+			copy.energy = energy;
+			return copy;
 		}
 	}
 }

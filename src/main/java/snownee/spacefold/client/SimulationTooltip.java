@@ -5,7 +5,9 @@ import java.util.List;
 
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
+import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.minecraft.world.inventory.tooltip.TooltipComponent;
 import net.minecraft.world.item.ItemStack;
 import snownee.spacefold.dim.SimulationResult;
@@ -27,8 +29,12 @@ public record SimulationTooltip(List<Entry> inputs, List<Entry> outputs, int sna
 
 	private static List<Entry> toEntries(SimulationResult.Rates rates) {
 		List<Entry> entries = new ArrayList<>();
-		rates.items().forEach((item, rate) -> entries.add(new Entry.Item(item.toStack(), rate)));
-		rates.fluids().forEach((fluid, rate) -> entries.add(new Entry.Fluid(fluid, rate)));
+		for (Object2DoubleMap.Entry<ItemVariant> entry : rates.items().object2DoubleEntrySet()) {
+			entries.add(new Entry.Item(entry.getKey().toStack(), entry.getDoubleValue()));
+		}
+		for (Object2DoubleMap.Entry<FluidVariant> entry : rates.fluids().object2DoubleEntrySet()) {
+			entries.add(new Entry.Fluid(entry.getKey(), entry.getDoubleValue()));
+		}
 		return entries;
 	}
 

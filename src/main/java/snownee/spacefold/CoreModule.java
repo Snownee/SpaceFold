@@ -32,6 +32,7 @@ import snownee.spacefold.block.ChamberWallBlock;
 import snownee.spacefold.block.FactoryBlock;
 import snownee.spacefold.block.InterfaceBlock;
 import snownee.spacefold.block.RepeaterBlock;
+import snownee.spacefold.block.SimulationRedstoneBlock;
 import snownee.spacefold.block.SimulatorBlock;
 import snownee.spacefold.block.entity.FactoryBlockEntity;
 import snownee.spacefold.block.entity.InterfaceBlockEntity;
@@ -66,9 +67,17 @@ public final class CoreModule extends AbstractModule {
 	public static final BlockObject<SimulatorBlock> SIMULATOR = block(SimulatorBlock::new, () -> Blocks.CRYING_OBSIDIAN);
 	public static final BlockObject<RepeaterBlock> REPEATER = block(RepeaterBlock::new, () -> Blocks.IRON_BLOCK);
 	public static final BlockObject<FactoryBlock> FACTORY = block(FactoryBlock::new, () -> Blocks.CRYING_OBSIDIAN);
+	public static final BlockObject<SimulationRedstoneBlock> SIMULATION_REDSTONE = block(
+			SimulationRedstoneBlock::new,
+			() -> Blocks.REDSTONE_BLOCK);
 	@KiwiModule.Name("factory")
 	public static final KiwiGO<PoiType> FACTORY_POI = go(() -> new PoiType(
 			Set.copyOf(FACTORY.getOrCreate()
+					.getStateDefinition()
+					.getPossibleStates()), 0, 1));
+	@KiwiModule.Name("simulation_redstone")
+	public static final KiwiGO<PoiType> SIMULATION_REDSTONE_POI = go(() -> new PoiType(
+			Set.copyOf(SIMULATION_REDSTONE.getOrCreate()
 					.getStateDefinition()
 					.getPossibleStates()), 0, 1));
 	public static final ItemObject<OpenerItem> OPENER = item(OpenerItem::new);
@@ -135,6 +144,7 @@ public final class CoreModule extends AbstractModule {
 		event.enqueueWork(() -> {
 			if (!Platform.isModLoaded("neoforge")) {
 				PoiTypes.registerBlockStates(FACTORY_POI.holderOrThrow(), FACTORY_POI.get().matchingStates());
+				PoiTypes.registerBlockStates(SIMULATION_REDSTONE_POI.holderOrThrow(), SIMULATION_REDSTONE_POI.get().matchingStates());
 			}
 			ItemStorage.SIDED.registerForBlockEntity(SimulatorBlockEntity::getItemStorage, SIMULATOR_BE.getOrCreate());
 			FluidStorage.SIDED.registerForBlockEntity(SimulatorBlockEntity::getFluidStorage, SIMULATOR_BE.getOrCreate());

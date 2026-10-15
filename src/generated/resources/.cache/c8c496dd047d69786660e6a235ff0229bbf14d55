@@ -1,7 +1,9 @@
 // 26.1.2	-999999999-01-01T00:00:00	Space Fold/Space Fold - Recipes
 14d274d05529eb4eb1d3fae0dc795dd683634249 data/spacefold/advancement/recipes/misc/factory.json
 41f0c528e390d83efd505bee6f1fcbb6f151bea0 data/spacefold/advancement/recipes/misc/simulator.json
+3bc7c480b0c7777d6a17b6d676695ee712d01343 data/spacefold/advancement/recipes/redstone/simulation_redstone.json
 51b987e1916cfb04afd6d842c2127343895e2c16 data/spacefold/advancement/recipes/tools/opener.json
 21fcdf22c845c3e944738fe0dfa46864b8f1df42 data/spacefold/recipe/factory.json
 5037e8a71f32bbd367873cc15e999f7959e0c6ed data/spacefold/recipe/opener.json
+f3d3eb6e09e0313dc565f2a593235804c8b7ed0f data/spacefold/recipe/simulation_redstone.json
 1756788d6cd96b7f1cbb86d8de6d99c511bb05b8 data/spacefold/recipe/simulator.json

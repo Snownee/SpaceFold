@@ -8,6 +8,8 @@ import java.util.Optional;
 
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidConstants;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -63,11 +65,11 @@ public class RepeaterContainer implements Container {
 	private void fillRates(int start, SimulationResult.Rates rates) {
 		int end = start + RepeaterMenu.SECTION_SLOTS;
 		int slot = start;
-		for (Map.Entry<ItemVariant, Double> entry : rates.items().entrySet()) {
-			slot = fillVariant(end, slot, entry.getKey(), (int) Math.round(entry.getValue()));
+		for (Object2DoubleMap.Entry<ItemVariant> entry : rates.items().object2DoubleEntrySet()) {
+			slot = fillVariant(end, slot, entry.getKey(), (int) Math.round(entry.getDoubleValue()));
 		}
-		for (Map.Entry<FluidVariant, Double> entry : rates.fluids().entrySet()) {
-			double rate = entry.getValue();
+		for (Object2DoubleMap.Entry<FluidVariant> entry : rates.fluids().object2DoubleEntrySet()) {
+			double rate = entry.getDoubleValue();
 			if (rate <= 0) {
 				continue;
 			}
@@ -115,8 +117,8 @@ public class RepeaterContainer implements Container {
 	}
 
 	private SimulationResult.Rates collectRates(int start) {
-		Map<ItemVariant, Double> itemRates = new LinkedHashMap<>();
-		Map<FluidVariant, Double> fluidRates = new LinkedHashMap<>();
+		Object2DoubleMap<ItemVariant> itemRates = new Object2DoubleLinkedOpenHashMap<>();
+		Object2DoubleMap<FluidVariant> fluidRates = new Object2DoubleLinkedOpenHashMap<>();
 		for (int slot = start; slot < start + RepeaterMenu.SECTION_SLOTS; slot++) {
 			ItemStack stack = items.get(slot);
 			if (stack.isEmpty()) {
@@ -124,9 +126,9 @@ public class RepeaterContainer implements Container {
 			}
 			FluidVariant fluid = fluidOf(stack);
 			if (fluid != null) {
-				fluidRates.merge(fluid, stack.getCount() * (double) BUCKET_AMOUNT, Double::sum);
+				fluidRates.mergeDouble(fluid, stack.getCount() * (double) BUCKET_AMOUNT, Double::sum);
 			} else {
-				itemRates.merge(ItemVariant.of(stack), (double) stack.getCount(), Double::sum);
+				itemRates.mergeDouble(ItemVariant.of(stack), stack.getCount(), Double::sum);
 			}
 		}
 		return new SimulationResult.Rates(itemRates, fluidRates, 0);

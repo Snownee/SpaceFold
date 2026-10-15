@@ -48,6 +48,7 @@ import snownee.spacefold.SpaceFold;
 import snownee.spacefold.SpaceFoldConfig;
 import snownee.spacefold.block.ChamberWallBlock;
 import snownee.spacefold.block.InterfaceBlock;
+import snownee.spacefold.block.SimulationRedstoneBlock;
 import snownee.spacefold.block.SimulatorBlock;
 import snownee.spacefold.block.entity.SimulatorBlockEntity;
 import snownee.spacefold.network.SHighlightBlocksPacket;
@@ -248,6 +249,9 @@ public final class RoomManager {
 					for (int dz = 0; dz < SpaceFoldConfig.roomSize; dz++) {
 						BlockPos at = origin.offset(dx, dy, dz);
 						BlockState state = source.getBlockState(at);
+						if (state.is(CoreModule.SIMULATION_REDSTONE.get())) {
+							state = state.setValue(SimulationRedstoneBlock.POWERED, false);
+						}
 						destination.setBlock(at, state, Block.UPDATE_CLIENTS);
 						if (!state.isAir()) {
 							if (!state.is(CoreModule.MIRROR_NBT_IGNORED)) {

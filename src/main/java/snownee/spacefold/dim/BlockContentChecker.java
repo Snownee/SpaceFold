@@ -55,9 +55,7 @@ public final class BlockContentChecker {
 			clearable.clearContent();
 		}
 		if (state.getBlock() instanceof WorldlyContainerHolder holder) {
-			if (holder.getContainer(state, level, pos) instanceof Clearable clearable) {
-				clearable.clearContent();
-			}
+			holder.getContainer(state, level, pos).clearContent();
 		}
 	}
 
@@ -65,8 +63,7 @@ public final class BlockContentChecker {
 		if (blockEntity instanceof Clearable) {
 			return true;
 		}
-		return state.getBlock() instanceof WorldlyContainerHolder holder
-				&& holder.getContainer(state, level, pos) instanceof Clearable;
+		return state.getBlock() instanceof WorldlyContainerHolder;
 	}
 
 	private static <T> boolean isEmpty(@Nullable Storage<T> storage) {

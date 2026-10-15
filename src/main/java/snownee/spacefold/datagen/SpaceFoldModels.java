@@ -47,6 +47,9 @@ public class SpaceFoldModels extends FabricModelProvider {
 		itemModelGenerators.itemModelOutput.accept(
 				CoreModule.FACTORY.asItem(),
 				ItemModelUtils.plainModel(ModelLocationUtils.getModelLocation(CoreModule.FACTORY.get())));
+		itemModelGenerators.itemModelOutput.accept(
+				CoreModule.SIMULATION_REDSTONE.asItem(),
+				ItemModelUtils.plainModel(ModelLocationUtils.getModelLocation(CoreModule.SIMULATION_REDSTONE.get())));
 		itemModelGenerators.generateFlatItem(CoreModule.OPENER.get(), ModelTemplates.FLAT_ITEM);
 	}
 }

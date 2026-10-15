@@ -1,19 +1,16 @@
 package snownee.spacefold.block.entity;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BooleanSupplier;
 import java.util.function.LongSupplier;
 import java.util.function.Predicate;
 
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
-import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
@@ -33,6 +30,7 @@ import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.world.Nameable;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.DirectionalBlock;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.ValueInput;
 import net.minecraft.world.level.storage.ValueOutput;
@@ -46,10 +44,10 @@ import snownee.spacefold.paint.RepeaterPaints;
 import team.reborn.energy.api.EnergyStorage;
 
 public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
-	private final Object2DoubleMap<ItemVariant> itemInput = new Object2DoubleOpenHashMap<>();
-	private final Object2DoubleMap<ItemVariant> itemOutput = new Object2DoubleOpenHashMap<>();
-	private final Object2DoubleMap<FluidVariant> fluidInput = new Object2DoubleOpenHashMap<>();
-	private final Object2DoubleMap<FluidVariant> fluidOutput = new Object2DoubleOpenHashMap<>();
+	private final Object2DoubleMap<ItemVariant> itemInput = new Object2DoubleLinkedOpenHashMap<>();
+	private final Object2DoubleMap<ItemVariant> itemOutput = new Object2DoubleLinkedOpenHashMap<>();
+	private final Object2DoubleMap<FluidVariant> fluidInput = new Object2DoubleLinkedOpenHashMap<>();
+	private final Object2DoubleMap<FluidVariant> fluidOutput = new Object2DoubleLinkedOpenHashMap<>();
 	private final Object paintsLock = new Object();
 	private final Storage<ItemVariant> itemInputBuffer;
 	private final Storage<ItemVariant> itemOutputBuffer;
@@ -105,22 +103,6 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 
 	private static <T> void add(Object2DoubleMap<T> map, T key, double delta) {
 		map.put(key, map.getDouble(key) + delta);
-	}
-
-	private static SimulationResult.Rates itemRates(Object2DoubleMap<ItemVariant> items) {
-		Map<ItemVariant, Double> map = new LinkedHashMap<>();
-		for (Object2DoubleMap.Entry<ItemVariant> entry : items.object2DoubleEntrySet()) {
-			map.put(entry.getKey(), entry.getDoubleValue());
-		}
-		return new SimulationResult.Rates(map, Map.of(), 0);
-	}
-
-	private static SimulationResult.Rates fluidRates(Object2DoubleMap<FluidVariant> fluids) {
-		Map<FluidVariant, Double> map = new LinkedHashMap<>();
-		for (Object2DoubleMap.Entry<FluidVariant> entry : fluids.object2DoubleEntrySet()) {
-			map.put(entry.getKey(), entry.getDoubleValue());
-		}
-		return new SimulationResult.Rates(Map.of(), map, 0);
 	}
 
 	public @Nullable SimulationResult getResult() {
@@ -249,56 +231,72 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 		if (level == null || level.isClientSide()) {
 			return;
 		}
-		push(level);
 		SimulationResult current = result;
 		if (current == null || current.failed()) {
 			return;
 		}
-		double dt = 1.0 / 20.0;
 		SimulationResult.Rates in = current.inputs();
 		SimulationResult.Rates out = current.outputs();
+		if (in.kindCount() == 0 && out.kindCount() == 0
+				&& itemInput.isEmpty() && fluidInput.isEmpty() && energyInput == 0
+				&& itemOutput.isEmpty() && fluidOutput.isEmpty() && energyOutput == 0) {
+			if (throttle != 1.0) {
+				throttle = 1.0;
+				setChanged();
+			}
+			return;
+		}
+		double dt = 1.0 / 20.0;
 		boolean unthrottled = in.kindCount() == 0;
 		if (unthrottled && throttle != 1.0) {
 			throttle = 1.0;
-			setChanged();
 		}
+		boolean consumed = false;
 		double inputFraction = 1.0;
-		for (Map.Entry<ItemVariant, Double> entry : in.items().entrySet()) {
-			double need = entry.getValue() * dt;
-			if (need <= 0) {
-				continue;
+		if (!in.items().isEmpty()) {
+			for (Object2DoubleMap.Entry<ItemVariant> entry : in.items().object2DoubleEntrySet()) {
+				double need = entry.getDoubleValue() * dt;
+				if (need <= 0) {
+					continue;
+				}
+				inputFraction = Math.min(inputFraction, itemInput.getDouble(entry.getKey()) / need);
 			}
-			inputFraction = Math.min(inputFraction, itemInput.getDouble(entry.getKey()) / need);
 		}
-		for (Map.Entry<FluidVariant, Double> entry : in.fluids().entrySet()) {
-			double need = entry.getValue() * dt;
-			if (need <= 0) {
-				continue;
+		if (!in.fluids().isEmpty()) {
+			for (Object2DoubleMap.Entry<FluidVariant> entry : in.fluids().object2DoubleEntrySet()) {
+				double need = entry.getDoubleValue() * dt;
+				if (need <= 0) {
+					continue;
+				}
+				inputFraction = Math.min(inputFraction, fluidInput.getDouble(entry.getKey()) / need);
 			}
-			inputFraction = Math.min(inputFraction, fluidInput.getDouble(entry.getKey()) / need);
 		}
 		double inEnergy = in.energy() * dt;
 		if (inEnergy > 0) {
 			inputFraction = Math.min(inputFraction, energyInput / inEnergy);
 		}
 		double outputFraction = 1.0;
-		for (Map.Entry<ItemVariant, Double> entry : out.items().entrySet()) {
-			double produce = entry.getValue() * throttle * dt;
-			if (produce <= 0) {
-				continue;
+		if (!out.items().isEmpty()) {
+			for (Object2DoubleMap.Entry<ItemVariant> entry : out.items().object2DoubleEntrySet()) {
+				double produce = entry.getDoubleValue() * throttle * dt;
+				if (produce <= 0) {
+					continue;
+				}
+				outputFraction = Math.min(
+						outputFraction,
+						(SpaceFoldConfig.repeaterItemBuffer - itemOutput.getDouble(entry.getKey())) / produce);
 			}
-			outputFraction = Math.min(
-					outputFraction,
-					(SpaceFoldConfig.repeaterItemBuffer - itemOutput.getDouble(entry.getKey())) / produce);
 		}
-		for (Map.Entry<FluidVariant, Double> entry : out.fluids().entrySet()) {
-			double produce = entry.getValue() * throttle * dt;
-			if (produce <= 0) {
-				continue;
+		if (!out.fluids().isEmpty()) {
+			for (Object2DoubleMap.Entry<FluidVariant> entry : out.fluids().object2DoubleEntrySet()) {
+				double produce = entry.getDoubleValue() * throttle * dt;
+				if (produce <= 0) {
+					continue;
+				}
+				outputFraction = Math.min(
+						outputFraction,
+						(SpaceFoldConfig.repeaterFluidBuffer - fluidOutput.getDouble(entry.getKey())) / produce);
 			}
-			outputFraction = Math.min(
-					outputFraction,
-					(SpaceFoldConfig.repeaterFluidBuffer - fluidOutput.getDouble(entry.getKey())) / produce);
 		}
 		double outEnergy = out.energy() * throttle * dt;
 		if (outEnergy > 0) {
@@ -307,108 +305,137 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 		if (inputFraction < 1.0 - 1.0E-9 || outputFraction < 1.0 - 1.0E-9) {
 			secondSatisfied = false;
 		} else {
-			for (Map.Entry<ItemVariant, Double> entry : in.items().entrySet()) {
-				add(itemInput, entry.getKey(), -entry.getValue() * dt);
+			for (Object2DoubleMap.Entry<ItemVariant> entry : in.items().object2DoubleEntrySet()) {
+				add(itemInput, entry.getKey(), -entry.getDoubleValue() * dt);
 			}
-			for (Map.Entry<FluidVariant, Double> entry : in.fluids().entrySet()) {
-				add(fluidInput, entry.getKey(), -entry.getValue() * dt);
+			for (Object2DoubleMap.Entry<FluidVariant> entry : in.fluids().object2DoubleEntrySet()) {
+				add(fluidInput, entry.getKey(), -entry.getDoubleValue() * dt);
 			}
 			energyInput -= in.energy() * dt;
-			for (Map.Entry<ItemVariant, Double> entry : out.items().entrySet()) {
-				add(itemOutput, entry.getKey(), entry.getValue() * throttle * dt);
+			for (Object2DoubleMap.Entry<ItemVariant> entry : out.items().object2DoubleEntrySet()) {
+				add(itemOutput, entry.getKey(), entry.getDoubleValue() * throttle * dt);
 			}
-			for (Map.Entry<FluidVariant, Double> entry : out.fluids().entrySet()) {
-				add(fluidOutput, entry.getKey(), entry.getValue() * throttle * dt);
+			for (Object2DoubleMap.Entry<FluidVariant> entry : out.fluids().object2DoubleEntrySet()) {
+				add(fluidOutput, entry.getKey(), entry.getDoubleValue() * throttle * dt);
 			}
 			energyOutput += out.energy() * throttle * dt;
-			setChanged();
+			consumed = true;
 		}
 		secondTicks++;
 		if (secondTicks >= 20) {
 			secondTicks = 0;
 			if (!unthrottled) {
 				double step = (secondSatisfied ? SpaceFoldConfig.repeaterRampUpPercent : -SpaceFoldConfig.repeaterRampDownPercent) / 100.0;
-				double updated = Math.max(0.0, Math.min(1.0, throttle + step));
+				double updated = Math.clamp(throttle + step, 0.0, 1.0);
 				if (updated != throttle) {
 					throttle = updated;
-					setChanged();
+					consumed = true;
 				}
 			}
 			secondSatisfied = true;
 		}
+		if (push(level)) {
+			consumed = true;
+		}
+		if (consumed) {
+			setChanged();
+		}
 	}
 
-	private void push(Level level) {
+	private boolean push(Level level) {
+		if (itemOutput.isEmpty() && fluidOutput.isEmpty() && energyOutput < 1) {
+			return false;
+		}
 		Direction targetSide = facing();
 		BlockPos target = worldPosition.relative(targetSide);
 		Direction side = targetSide.getOpposite();
-		pushItems(level, target, side);
-		pushFluids(level, target, side);
-		pushEnergy(level, target, side);
+		BlockState state = level.getBlockState(target);
+		if (state.isAir()) {
+			return false;
+		}
+		BlockEntity blockEntity = state.hasBlockEntity() ? level.getBlockEntity(target) : null;
+		boolean moved = pushItems(level, target, state, blockEntity, side);
+		moved |= pushFluids(level, target, state, blockEntity, side);
+		moved |= pushEnergy(level, target, state, blockEntity, side);
+		return moved;
 	}
 
-	private void pushItems(Level level, BlockPos target, Direction side) {
-		Storage<ItemVariant> storage = ItemStorage.SIDED.find(level, target, side);
-		if (storage == null) {
-			return;
+	private boolean pushItems(Level level, BlockPos target, BlockState state, @Nullable BlockEntity blockEntity, Direction side) {
+		if (itemOutput.isEmpty()) {
+			return false;
 		}
-		List<ItemVariant> keys = new ArrayList<>();
-		for (Object2DoubleMap.Entry<ItemVariant> entry : itemOutput.object2DoubleEntrySet()) {
-			if (entry.getDoubleValue() >= 1) {
-				keys.add(entry.getKey());
-			}
-		}
-		if (keys.isEmpty()) {
-			return;
-		}
-		Map<ItemVariant, Long> moved = new HashMap<>();
+		Storage<ItemVariant> storage = null;
+		boolean moved = false;
 		try (Transaction transaction = Transaction.openOuter()) {
-			for (ItemVariant variant : keys) {
-				long inserted = storage.insert(variant, (long) itemOutput.getDouble(variant), transaction);
+			for (Object2DoubleMap.Entry<ItemVariant> entry : itemOutput.object2DoubleEntrySet()) {
+				long amount = (long) entry.getDoubleValue();
+				if (amount < 1) {
+					continue;
+				}
+				if (storage == null) {
+					storage = ItemStorage.SIDED.find(level, target, state, blockEntity, side);
+					if (storage == null) {
+						return false;
+					}
+				}
+				ItemVariant variant = entry.getKey();
+				long inserted = storage.insert(variant, amount, transaction);
 				if (inserted > 0) {
-					moved.merge(variant, inserted, Long::sum);
+					transaction.addOuterCloseCallback(result -> {
+						if (result.wasCommitted()) {
+							add(itemOutput, variant, -inserted);
+						}
+					});
+					moved = true;
 				}
 			}
 			transaction.commit();
 		}
-		moved.forEach((variant, amount) -> add(itemOutput, variant, -amount));
+		return moved;
 	}
 
-	private void pushFluids(Level level, BlockPos target, Direction side) {
-		Storage<FluidVariant> storage = FluidStorage.SIDED.find(level, target, side);
-		if (storage == null) {
-			return;
+	private boolean pushFluids(Level level, BlockPos target, BlockState state, @Nullable BlockEntity blockEntity, Direction side) {
+		if (fluidOutput.isEmpty()) {
+			return false;
 		}
-		List<FluidVariant> keys = new ArrayList<>();
-		for (Object2DoubleMap.Entry<FluidVariant> entry : fluidOutput.object2DoubleEntrySet()) {
-			if (entry.getDoubleValue() >= 1) {
-				keys.add(entry.getKey());
-			}
-		}
-		if (keys.isEmpty()) {
-			return;
-		}
-		Map<FluidVariant, Long> moved = new HashMap<>();
+		Storage<FluidVariant> storage = null;
+		boolean moved = false;
 		try (Transaction transaction = Transaction.openOuter()) {
-			for (FluidVariant variant : keys) {
-				long inserted = storage.insert(variant, (long) fluidOutput.getDouble(variant), transaction);
+			for (Object2DoubleMap.Entry<FluidVariant> entry : fluidOutput.object2DoubleEntrySet()) {
+				long amount = (long) entry.getDoubleValue();
+				if (amount < 1) {
+					continue;
+				}
+				if (storage == null) {
+					storage = FluidStorage.SIDED.find(level, target, state, blockEntity, side);
+					if (storage == null) {
+						return false;
+					}
+				}
+				FluidVariant variant = entry.getKey();
+				long inserted = storage.insert(variant, amount, transaction);
 				if (inserted > 0) {
-					moved.merge(variant, inserted, Long::sum);
+					transaction.addOuterCloseCallback(result -> {
+						if (result.wasCommitted()) {
+							add(fluidOutput, variant, -inserted);
+						}
+					});
+					moved = true;
 				}
 			}
 			transaction.commit();
 		}
-		moved.forEach((variant, amount) -> add(fluidOutput, variant, -amount));
+		return moved;
 	}
 
-	private void pushEnergy(Level level, BlockPos target, Direction side) {
+	private boolean pushEnergy(Level level, BlockPos target, BlockState state, @Nullable BlockEntity blockEntity, Direction side) {
 		long amount = (long) energyOutput;
 		if (amount <= 0) {
-			return;
+			return false;
 		}
-		EnergyStorage storage = EnergyStorage.SIDED.find(level, target, side);
+		EnergyStorage storage = EnergyStorage.SIDED.find(level, target, state, blockEntity, side);
 		if (storage == null) {
-			return;
+			return false;
 		}
 		long inserted;
 		try (Transaction transaction = Transaction.openOuter()) {
@@ -417,7 +444,9 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 		}
 		if (inserted > 0) {
 			energyOutput -= inserted;
+			return true;
 		}
+		return false;
 	}
 
 	@Override
@@ -425,13 +454,9 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 		super.saveAdditional(output);
 		output.storeNullable("CustomName", ComponentSerialization.CODEC, name);
 		output.storeNullable("result", SimulationResult.CODEC, result);
-		output.store("paints", RepeaterPaints.CODEC, paints);
-		output.store("item_input", SimulationResult.Rates.CODEC, itemRates(itemInput));
-		output.store("item_output", SimulationResult.Rates.CODEC, itemRates(itemOutput));
-		output.store("fluid_input", SimulationResult.Rates.CODEC, fluidRates(fluidInput));
-		output.store("fluid_output", SimulationResult.Rates.CODEC, fluidRates(fluidOutput));
-		output.store("energy_input", SimulationResult.Rates.CODEC, new SimulationResult.Rates(Map.of(), Map.of(), energyInput));
-		output.store("energy_output", SimulationResult.Rates.CODEC, new SimulationResult.Rates(Map.of(), Map.of(), energyOutput));
+		output.storeNullable("paints", RepeaterPaints.CODEC, paints.isEmpty() ? null : paints);
+		output.store("inputs", SimulationResult.Rates.CODEC, new SimulationResult.Rates(itemInput, fluidInput, energyInput));
+		output.store("outputs", SimulationResult.Rates.CODEC, new SimulationResult.Rates(itemOutput, fluidOutput, energyOutput));
 		output.putDouble("throttle", throttle);
 	}
 
@@ -441,12 +466,16 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 		name = parseCustomNameSafe(input, "CustomName");
 		result = input.read("result", SimulationResult.CODEC).orElse(null);
 		paints = input.read("paints", RepeaterPaints.CODEC).orElse(RepeaterPaints.EMPTY);
-		input.read("item_input", SimulationResult.Rates.CODEC).ifPresent(rates -> itemInput.putAll(rates.items()));
-		input.read("item_output", SimulationResult.Rates.CODEC).ifPresent(rates -> itemOutput.putAll(rates.items()));
-		input.read("fluid_input", SimulationResult.Rates.CODEC).ifPresent(rates -> fluidInput.putAll(rates.fluids()));
-		input.read("fluid_output", SimulationResult.Rates.CODEC).ifPresent(rates -> fluidOutput.putAll(rates.fluids()));
-		input.read("energy_input", SimulationResult.Rates.CODEC).ifPresent(rates -> energyInput = rates.energy());
-		input.read("energy_output", SimulationResult.Rates.CODEC).ifPresent(rates -> energyOutput = rates.energy());
+		input.read("inputs", SimulationResult.Rates.CODEC).ifPresent(rates -> {
+			itemInput.putAll(rates.items());
+			fluidInput.putAll(rates.fluids());
+			energyInput = rates.energy();
+		});
+		input.read("outputs", SimulationResult.Rates.CODEC).ifPresent(rates -> {
+			itemOutput.putAll(rates.items());
+			fluidOutput.putAll(rates.fluids());
+			energyOutput = rates.energy();
+		});
 		throttle = input.getDoubleOr("throttle", SpaceFoldConfig.repeaterInitialThrottlePercent / 100.0);
 		secondTicks = 0;
 		secondSatisfied = true;
@@ -462,7 +491,7 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 
 	@Override
 	protected void writePacketData(ValueOutput valueOutput) {
-		valueOutput.store("paints", RepeaterPaints.CODEC, paints);
+		valueOutput.storeNullable("paints", RepeaterPaints.CODEC, paints.isEmpty() ? null : paints);
 	}
 
 	private record VariantBuffer<T>(
@@ -472,104 +501,104 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 			Predicate<T> filter) implements Storage<T> {
 
 		@Override
-			public long insert(T resource, long maxAmount, TransactionContext transaction) {
-				if (output || !filter.test(resource)) {
-					return 0;
-				}
-				long space = capacity.getAsLong() - (long) amounts.getDouble(resource);
-				if (space <= 0) {
-					return 0;
-				}
-				long moved = Math.min(maxAmount, space);
-				if (moved <= 0) {
-					return 0;
-				}
-				transaction.addOuterCloseCallback(result -> {
-					if (result.wasCommitted()) {
-						add(amounts, resource, moved);
-					}
-				});
-				return moved;
+		public long insert(T resource, long maxAmount, TransactionContext transaction) {
+			if (output || !filter.test(resource)) {
+				return 0;
 			}
-
-			@Override
-			public boolean supportsInsertion() {
-				return !output;
+			long space = capacity.getAsLong() - (long) amounts.getDouble(resource);
+			if (space <= 0) {
+				return 0;
 			}
-
-			@Override
-			public long extract(T resource, long maxAmount, TransactionContext transaction) {
-				if (!output) {
-					return 0;
+			long moved = Math.min(maxAmount, space);
+			if (moved <= 0) {
+				return 0;
+			}
+			transaction.addOuterCloseCallback(result -> {
+				if (result.wasCommitted()) {
+					add(amounts, resource, moved);
 				}
-				long moved = Math.min(maxAmount, (long) amounts.getDouble(resource));
-				if (moved <= 0) {
-					return 0;
-				}
-				transaction.addOuterCloseCallback(result -> {
-					if (result.wasCommitted()) {
-						add(amounts, resource, -moved);
-					}
-				});
-				return moved;
-			}
-
-			@Override
-			public boolean supportsExtraction() {
-				return output;
-			}
-
-			@Override
-			public Iterator<StorageView<T>> iterator() {
-				List<StorageView<T>> views = new ArrayList<>();
-				for (Object2DoubleMap.Entry<T> entry : amounts.object2DoubleEntrySet()) {
-					double amount = entry.getDoubleValue();
-					if (amount < 1) {
-						continue;
-					}
-					T resource = entry.getKey();
-					views.add(new StorageView<T>() {
-						@Override
-						public long extract(T extracted, long maxAmount, TransactionContext transaction) {
-							if (!output) {
-								return 0;
-							}
-							long moved = Math.min(maxAmount, (long) amount);
-							if (moved <= 0) {
-								return 0;
-							}
-							transaction.addOuterCloseCallback(result -> {
-								if (result.wasCommitted()) {
-									add(amounts, resource, -moved);
-								}
-							});
-							return moved;
-						}
-
-						@Override
-						public boolean isResourceBlank() {
-							return false;
-						}
-
-						@Override
-						public T getResource() {
-							return resource;
-						}
-
-						@Override
-						public long getAmount() {
-							return (long) amount;
-						}
-
-						@Override
-						public long getCapacity() {
-							return capacity.getAsLong();
-						}
-					});
-				}
-				return views.iterator();
-			}
+			});
+			return moved;
 		}
+
+		@Override
+		public boolean supportsInsertion() {
+			return !output;
+		}
+
+		@Override
+		public long extract(T resource, long maxAmount, TransactionContext transaction) {
+			if (!output) {
+				return 0;
+			}
+			long moved = Math.min(maxAmount, (long) amounts.getDouble(resource));
+			if (moved <= 0) {
+				return 0;
+			}
+			transaction.addOuterCloseCallback(result -> {
+				if (result.wasCommitted()) {
+					add(amounts, resource, -moved);
+				}
+			});
+			return moved;
+		}
+
+		@Override
+		public boolean supportsExtraction() {
+			return output;
+		}
+
+		@Override
+		public Iterator<StorageView<T>> iterator() {
+			List<StorageView<T>> views = new ArrayList<>();
+			for (Object2DoubleMap.Entry<T> entry : amounts.object2DoubleEntrySet()) {
+				double amount = entry.getDoubleValue();
+				if (amount < 1) {
+					continue;
+				}
+				T resource = entry.getKey();
+				views.add(new StorageView<T>() {
+					@Override
+					public long extract(T extracted, long maxAmount, TransactionContext transaction) {
+						if (!output) {
+							return 0;
+						}
+						long moved = Math.min(maxAmount, (long) amount);
+						if (moved <= 0) {
+							return 0;
+						}
+						transaction.addOuterCloseCallback(result -> {
+							if (result.wasCommitted()) {
+								add(amounts, resource, -moved);
+							}
+						});
+						return moved;
+					}
+
+					@Override
+					public boolean isResourceBlank() {
+						return false;
+					}
+
+					@Override
+					public T getResource() {
+						return resource;
+					}
+
+					@Override
+					public long getAmount() {
+						return (long) amount;
+					}
+
+					@Override
+					public long getCapacity() {
+						return capacity.getAsLong();
+					}
+				});
+			}
+			return views.iterator();
+		}
+	}
 
 	private final class EnergyBuffer implements EnergyStorage {
 		private final boolean output;

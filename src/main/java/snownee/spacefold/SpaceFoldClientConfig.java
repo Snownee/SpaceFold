@@ -10,6 +10,10 @@ public final class SpaceFoldClientConfig {
 	@KiwiConfig.Path("preview.snapshotYaws")
 	public static String snapshotYaws = "";
 
+	@KiwiConfig.Path("preview.cacheLimit")
+	@KiwiConfig.Range(min = 1, max = 4096)
+	public static int previewCacheLimit = 256;
+
 	@KiwiConfig.Path("debug.pip")
 	public static boolean debugPip = false;
 

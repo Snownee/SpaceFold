@@ -2,7 +2,6 @@ package snownee.spacefold.recipe;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.DoubleUnaryOperator;
@@ -16,6 +15,7 @@ import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 
 import io.netty.buffer.ByteBuf;
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredient;
 import net.fabricmc.fabric.api.recipe.v1.ingredient.CustomIngredientSerializer;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
@@ -187,13 +187,13 @@ public class SimulationIngredient implements CustomIngredient {
 				if (item.isPresent()) {
 					Ingredient ingredient = item.get();
 					value = 0;
-					for (Map.Entry<ItemVariant, Double> entry : rates.items().entrySet()) {
+					for (Object2DoubleMap.Entry<ItemVariant> entry : rates.items().object2DoubleEntrySet()) {
 						if (ingredient.test(entry.getKey().toStack())) {
-							value += entry.getValue();
+							value += entry.getDoubleValue();
 						}
 					}
 				} else if (fluid.isPresent()) {
-					value = rates.fluids().getOrDefault(fluid.get(), 0.0);
+					value = rates.fluids().getDouble(fluid.get());
 				} else {
 					value = rates.energy();
 				}

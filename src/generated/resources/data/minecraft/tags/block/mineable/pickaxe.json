@@ -2,6 +2,7 @@
   "values": [
     "spacefold:simulator",
     "spacefold:factory",
-    "spacefold:repeater"
+    "spacefold:repeater",
+    "spacefold:simulation_redstone"
   ]
 }

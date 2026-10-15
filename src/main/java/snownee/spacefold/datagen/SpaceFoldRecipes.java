@@ -49,6 +49,15 @@ public class SpaceFoldRecipes extends FabricRecipeProvider {
 						.pattern(" O ")
 						.unlockedBy("has_item", has(Blocks.CRYING_OBSIDIAN))
 						.save(output);
+
+				shaped(RecipeCategory.REDSTONE, CoreModule.SIMULATION_REDSTONE.get())
+						.define('R', Blocks.REDSTONE_BLOCK)
+						.define('A', Items.AMETHYST_SHARD)
+						.pattern(" A ")
+						.pattern("ARA")
+						.pattern(" A ")
+						.unlockedBy("has_item", has(Blocks.REDSTONE_BLOCK))
+						.save(output);
 			}
 		};
 	}

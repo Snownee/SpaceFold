@@ -2,8 +2,8 @@ package snownee.spacefold.util;
 
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -69,20 +69,27 @@ public class ClientProxy implements ClientModInitializer {
 	}
 
 	private static void appendSimulationTooltip(ItemStack stack, Item.TooltipContext context, TooltipFlag flag, List<Component> lines) {
+		float progress = ViewDetailsKey.progress();
+		int shade = 0xAA + Math.round((0xFF - 0xAA) * progress);
+		int color = shade << 16 | shade << 8 | shade;
 		SimulationResult result = stack.get(CoreModule.SIMULATION_RESULT.get());
 		if (result == null) {
+			if (ViewDetailsKey.canConfigure(stack)) {
+				lines.add(Component.translatable(
+								"gui.spacefold.repeater_configure_hint",
+								Component.keybind("key.spacefold.view_details"))
+						.withColor(color));
+			}
 			return;
 		}
 		if (Minecraft.getInstance().hasShiftDown()) {
 			addSection(lines, "gui.spacefold.inputs", result.inputs());
 			addSection(lines, "gui.spacefold.outputs", result.outputs());
 		}
-		float progress = ViewDetailsKey.progress();
-		int shade = 0xAA + Math.round((0xFF - 0xAA) * progress);
 		lines.add(Component.translatable(
 						"gui.spacefold.repeater_materials_hint",
 						Component.keybind("key.spacefold.view_details"))
-				.withColor(shade << 16 | shade << 8 | shade));
+				.withColor(color));
 	}
 
 	private static void addSection(List<Component> lines, String header, SimulationResult.Rates rates) {
@@ -90,17 +97,17 @@ public class ClientProxy implements ClientModInitializer {
 			return;
 		}
 		lines.add(Component.translatable(header));
-		for (Map.Entry<ItemVariant, Double> entry : rates.items().entrySet()) {
+		for (Object2DoubleMap.Entry<ItemVariant> entry : rates.items().object2DoubleEntrySet()) {
 			lines.add(Component.translatable(
 					"gui.spacefold.item_rate",
 					entry.getKey().toStack().getHoverName(),
-					format(entry.getValue())));
+					format(entry.getDoubleValue())));
 		}
-		for (Map.Entry<FluidVariant, Double> entry : rates.fluids().entrySet()) {
+		for (Object2DoubleMap.Entry<FluidVariant> entry : rates.fluids().object2DoubleEntrySet()) {
 			lines.add(Component.translatable(
 					"gui.spacefold.fluid_rate",
 					FluidVariantAttributes.getName(entry.getKey()),
-					format(FluidAmounts.toMilliBuckets(entry.getValue()))));
+					format(FluidAmounts.toMilliBuckets(entry.getDoubleValue()))));
 		}
 		if (rates.energy() > 0) {
 			lines.add(Component.translatable("gui.spacefold.energy_rate", format(rates.energy())));
