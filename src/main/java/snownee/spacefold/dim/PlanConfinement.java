@@ -1,6 +1,8 @@
 package snownee.spacefold.dim;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -9,11 +11,14 @@ import net.fabricmc.fabric.api.entity.event.v1.ServerPlayerEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import snownee.spacefold.SpaceFoldConfig;
 
 public final class PlanConfinement {
 	private static final Map<UUID, Integer> LOCKS = new HashMap<>();
+	private static final double FALL_MARGIN = 8.0D;
 
 	private PlanConfinement() {
 	}
@@ -40,49 +45,54 @@ public final class PlanConfinement {
 		if (!RoomManager.isRoomDimension(level) || !SpaceFoldConfig.confinementEnabled) {
 			return;
 		}
-		for (ServerPlayer player : level.players()) {
-			confine(level, player);
-		}
-	}
-
-	private static void confine(ServerLevel level, ServerPlayer player) {
-		if (player.isCreative()) {
+		if (RoomManager.roomCount(level) <= 0) {
 			return;
 		}
-		int room = anchorRoom(level, player);
-		if (room < 0) {
-			room = RoomManager.nearestRoom(level, player.blockPosition());
-			if (room < 0) {
-				return;
+		List<LivingEntity> entities = new ArrayList<>();
+		for (Entity entity : level.getAllEntities()) {
+			if (entity instanceof LivingEntity living && !living.isRemoved()) {
+				entities.add(living);
 			}
-			LOCKS.put(player.getUUID(), room);
 		}
-		clamp(player, room);
+		for (LivingEntity entity : entities) {
+			confine(level, entity);
+		}
 	}
 
-	private static int anchorRoom(ServerLevel level, ServerPlayer player) {
-		Integer locked = LOCKS.get(player.getUUID());
+	private static void confine(ServerLevel level, LivingEntity entity) {
+		int room = anchorRoom(level, entity);
+		if (room < 0) {
+			return;
+		}
+		if (entity instanceof ServerPlayer player && !player.isCreative() && !LOCKS.containsKey(player.getUUID())) {
+			LOCKS.put(player.getUUID(), room);
+		}
+		if (!needsRescue(level, entity, room)) {
+			return;
+		}
+		RoomManager.rescue(level, entity, room);
+	}
+
+	private static int anchorRoom(ServerLevel level, LivingEntity entity) {
+		Integer locked = entity instanceof ServerPlayer player ? LOCKS.get(player.getUUID()) : null;
 		if (locked != null && locked >= 0 && locked < RoomManager.roomCount(level)) {
 			return locked;
 		}
-		return RoomManager.currentRoom(level, player);
+		int room = RoomGeometry.roomAt(entity.getX(), entity.getY(), entity.getZ());
+		if (room >= 0 && room < RoomManager.roomCount(level)) {
+			return room;
+		}
+		return RoomManager.nearestRoom(level, entity.blockPosition());
 	}
 
-	private static void clamp(ServerPlayer player, int room) {
-		double x = player.getX();
-		double y = player.getY();
-		double z = player.getZ();
-		Vec3 clamped = RoomGeometry.clamp(room, x, y, z);
-		if (clamped.x == x && clamped.y == y && clamped.z == z) {
-			return;
+	private static boolean needsRescue(ServerLevel level, LivingEntity entity, int room) {
+		if (entity.getY() < level.getMinY() + FALL_MARGIN) {
+			return true;
 		}
-
-		Vec3 velocity = player.getDeltaMovement();
-		double vx = clamped.x == x ? velocity.x : 0.0D;
-		double vy = clamped.y == y ? velocity.y : 0.0D;
-		double vz = clamped.z == z ? velocity.z : 0.0D;
-		player.teleportTo(clamped.x, clamped.y, clamped.z);
-		player.setDeltaMovement(vx, vy, vz);
-		player.resetFallDistance();
+		if (entity instanceof ServerPlayer player && player.isCreative()) {
+			return false;
+		}
+		Vec3 clamped = RoomGeometry.clamp(room, entity.getX(), entity.getY(), entity.getZ());
+		return clamped.x != entity.getX() || clamped.y != entity.getY() || clamped.z != entity.getZ();
 	}
 }

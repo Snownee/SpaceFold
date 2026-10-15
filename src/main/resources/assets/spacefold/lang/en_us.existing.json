@@ -83,6 +83,10 @@
 	"spacefold.config.trial": "Trial",
 	"spacefold.config.engine": "Shard Engine",
 	"spacefold.config.carver": "Shard Carver",
+	"spacefold.config.room.fogVolume": "Fog Volume",
+	"spacefold.config.room.fogVolume.desc": "Renders distant volumetric fog in the shard dimensions (not the GUI sky)",
+	"spacefold.config.room.shootingStars": "Shooting Stars",
+	"spacefold.config.room.shootingStars.desc": "Renders shooting stars in the shard dimensions (not the GUI sky)",
 	"dimension.spacefold.plan": "Shard Field",
 	"dimension.spacefold.simulate": "Trial Field"
 }

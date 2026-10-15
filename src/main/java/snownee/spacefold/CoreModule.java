@@ -1,20 +1,20 @@
 package snownee.spacefold;
 
 import java.util.Map;
+import java.util.Set;
 
 import com.mojang.serialization.Codec;
 
-import net.fabricmc.fabric.api.object.builder.v1.world.poi.PoiHelper;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidStorage;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemStorage;
 import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.TicketType;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.ai.village.poi.PoiType;
+import net.minecraft.world.entity.ai.village.poi.PoiTypes;
 import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTab;
@@ -61,7 +61,6 @@ public final class CoreModule extends AbstractModule {
 	public static final TagKey<Block> ROOM_IGNORED = blockTag("room_ignored");
 	public static final TagKey<Block> MIRROR_NBT_IGNORED = blockTag("mirror_nbt_ignored");
 	public static final TagKey<Block> CHAMBER_WINDOWS = blockTag("chamber_windows");
-	public static final ResourceKey<PoiType> FACTORY_POI = ResourceKey.create(Registries.POINT_OF_INTEREST_TYPE, SpaceFold.id("factory"));
 
 	public static final BlockObject<ChamberWallBlock> CHAMBER_WALL = block(ChamberWallBlock::new);
 	public static final BlockObject<ChamberWallBlock> CHAMBER_WINDOW = block(ChamberWallBlock::new);
@@ -70,6 +69,11 @@ public final class CoreModule extends AbstractModule {
 	public static final BlockObject<SimulatorBlock> SIMULATOR = block(SimulatorBlock::new, () -> Blocks.CRYING_OBSIDIAN);
 	public static final BlockObject<RepeaterBlock> REPEATER = block(RepeaterBlock::new, () -> Blocks.IRON_BLOCK);
 	public static final BlockObject<FactoryBlock> FACTORY = block(FactoryBlock::new, () -> Blocks.CRYING_OBSIDIAN);
+	@KiwiModule.Name("factory")
+	public static final KiwiGO<PoiType> FACTORY_POI = go(() -> new PoiType(
+			Set.copyOf(FACTORY.getOrCreate()
+					.getStateDefinition()
+					.getPossibleStates()), 0, 1));
 	public static final ItemObject<OpenerItem> OPENER = item(OpenerItem::new);
 	@KiwiModule.Name("simulation")
 	public static final KiwiGO<TicketType> SIMULATION_TICKET = go(
@@ -124,7 +128,6 @@ public final class CoreModule extends AbstractModule {
 
 	@Override
 	protected void addEntries() {
-		PoiHelper.register(FACTORY_POI.identifier(), 0, 1, FACTORY.getOrCreate());
 		if (Platform.isPhysicalClient()) {
 			ClientProxy.registerFactoryRenderer();
 		}
@@ -133,6 +136,9 @@ public final class CoreModule extends AbstractModule {
 	@Override
 	protected void init(InitEvent event) {
 		event.enqueueWork(() -> {
+			if (!Platform.isModLoaded("neoforge")) {
+				PoiTypes.registerBlockStates(FACTORY_POI.holderOrThrow(), FACTORY_POI.get().matchingStates());
+			}
 			ItemStorage.SIDED.registerForBlockEntity(SimulatorBlockEntity::getItemStorage, SIMULATOR_BE.getOrCreate());
 			FluidStorage.SIDED.registerForBlockEntity(SimulatorBlockEntity::getFluidStorage, SIMULATOR_BE.getOrCreate());
 			EnergyStorage.SIDED.registerForBlockEntity(SimulatorBlockEntity::getEnergyStorage, SIMULATOR_BE.getOrCreate());

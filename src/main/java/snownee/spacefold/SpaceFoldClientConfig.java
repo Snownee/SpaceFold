@@ -18,4 +18,13 @@ public final class SpaceFoldClientConfig {
 
 	@KiwiConfig.Path("room.windows")
 	public static boolean roomWindows = true;
+
+	@KiwiConfig.Path("room.ambientOcclusion")
+	public static float roomAmbientOcclusion = 0.6F;
+
+	@KiwiConfig.Path("room.fogVolume")
+	public static boolean roomFogVolume = true;
+
+	@KiwiConfig.Path("room.shootingStars")
+	public static boolean roomShootingStars = true;
 }

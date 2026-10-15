@@ -28,6 +28,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.datafix.DataFixTypes;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Relative;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -212,6 +213,26 @@ public final class RoomManager {
 			entity.setPortalCooldown(TELEPORT_COOLDOWN);
 			teleportLookingAt(entity, destination, landing.x, landing.y, landing.z, simulator);
 		}
+	}
+
+	public static void rescue(ServerLevel level, LivingEntity entity, int room) {
+		entity.resetFallDistance();
+		GlobalPos sourceRef = source(level, room);
+		if (sourceRef != null) {
+			ServerLevel destination = level.getServer().getLevel(sourceRef.dimension());
+			BlockPos link = sourceRef.pos();
+			if (destination != null && CoreModule.SIMULATOR.is(destination.getBlockState(link))) {
+				entity.setPortalCooldown(TELEPORT_COOLDOWN);
+				Vec3 landing = safeLanding(entity.getType(), destination, link);
+				teleportLookingAt(entity, destination, landing.x, landing.y, landing.z, link);
+				return;
+			}
+		}
+		BlockPos simulator = simulatorPos(level, room);
+		BlockPos target = simulator == null ? innerPos(room) : simulator;
+		Vec3 landing = safeLanding(entity.getType(), level, target);
+		entity.setPortalCooldown(TELEPORT_COOLDOWN);
+		teleportLookingAt(entity, level, landing.x, landing.y, landing.z, target);
 	}
 
 	private static void mirror(ServerLevel source, ServerLevel destination, int room) {

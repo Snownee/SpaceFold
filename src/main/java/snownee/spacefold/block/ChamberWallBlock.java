@@ -24,6 +24,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.EntityCollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import snownee.spacefold.SpaceFoldClientConfig;
 
 public class ChamberWallBlock extends DirectionalBlock {
 	public static final MapCodec<ChamberWallBlock> CODEC = simpleCodec(ChamberWallBlock::new);
@@ -49,6 +50,16 @@ public class ChamberWallBlock extends DirectionalBlock {
 	@Override
 	protected MapCodec<? extends DirectionalBlock> codec() {
 		return CODEC;
+	}
+
+	@Override
+	protected int getLightDampening(BlockState state) {
+		return 0;
+	}
+
+	@Override
+	protected float getShadeBrightness(BlockState state, BlockGetter level, BlockPos pos) {
+		return SpaceFoldClientConfig.roomAmbientOcclusion;
 	}
 
 	@Override

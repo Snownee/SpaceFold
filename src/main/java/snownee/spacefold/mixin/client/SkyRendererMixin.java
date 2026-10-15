@@ -14,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.SkyRenderer;
 import net.minecraft.world.level.MoonPhase;
+import snownee.spacefold.SpaceFoldClientConfig;
 import snownee.spacefold.client.sky.FogVolume;
 import snownee.spacefold.client.sky.ShootingStars;
 import snownee.spacefold.dim.RoomManager;
@@ -54,12 +55,16 @@ public abstract class SkyRendererMixin {
 		if (!spacefold$isRoomDimension()) {
 			return;
 		}
-		FogVolume.render(poseStack, 1.0F);
-		poseStack.pushPose();
-		poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F));
-		poseStack.mulPose(Axis.XP.rotation(starAngle));
-		ShootingStars.render(poseStack, starBrightness);
-		poseStack.popPose();
+		if (SpaceFoldClientConfig.roomFogVolume) {
+			FogVolume.render(poseStack, 1.0F);
+		}
+		if (SpaceFoldClientConfig.roomShootingStars) {
+			poseStack.pushPose();
+			poseStack.mulPose(Axis.YP.rotationDegrees(-90.0F));
+			poseStack.mulPose(Axis.XP.rotation(starAngle));
+			ShootingStars.render(poseStack, starBrightness);
+			poseStack.popPose();
+		}
 	}
 
 	@Unique

@@ -146,7 +146,13 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 				pendingItem = ItemStack.EMPTY;
 				setItem(TEMPLATE_SLOT, stack);
 				shake();
-				level.playSound(null, getBlockPos(), SoundEvents.AMETHYST_CLUSTER_PLACE, SoundSource.BLOCKS, 1.0F, 0.9F + level.getRandom().nextFloat() * 0.2F);
+				level.playSound(
+						null,
+						getBlockPos(),
+						SoundEvents.AMETHYST_CLUSTER_PLACE,
+						SoundSource.BLOCKS,
+						1.0F,
+						0.9F + level.getRandom().nextFloat() * 0.2F);
 			}
 			return;
 		}
@@ -189,6 +195,9 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	}
 
 	private @Nullable FactoryBlockEntity findEmptyFactory() {
+		if (level == null || level.isClientSide()) {
+			return null;
+		}
 		if (cachedReceiverPos != null && level.isLoaded(cachedReceiverPos) &&
 				level.getBlockEntity(cachedReceiverPos) instanceof FactoryBlockEntity cached && cached.isEmpty() &&
 				hasClearPath(cachedReceiverPos)) {
@@ -199,7 +208,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 		FactoryBlockEntity nearest = null;
 		double nearestDistance = Double.MAX_VALUE;
 		boolean obstructed = false;
-		Predicate<Holder<PoiType>> predicate = holder -> holder.is(CoreModule.FACTORY_POI);
+		Predicate<Holder<PoiType>> predicate = holder -> CoreModule.FACTORY_POI.is(holder.value());
 		for (BlockPos candidate : ((ServerLevel) level).getPoiManager()
 				.findAll(predicate, pos -> !pos.equals(origin), origin, 10, PoiManager.Occupancy.ANY)
 				.toList()) {
@@ -386,7 +395,13 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 		int duration = 10;
 		receiver.acceptPending(made, duration);
 		shake();
-		level.playSound(null, getBlockPos(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 0.8F + level.getRandom().nextFloat() * 0.4F);
+		level.playSound(
+				null,
+				getBlockPos(),
+				SoundEvents.AMETHYST_BLOCK_CHIME,
+				SoundSource.BLOCKS,
+				1.0F,
+				0.8F + level.getRandom().nextFloat() * 0.4F);
 		Vec3 from = Vec3.atCenterOf(getBlockPos().above());
 		Vec3 to = Vec3.atCenterOf(receiver.getBlockPos().above());
 		((ServerLevel) level).sendParticles(new BeamParticleOptions(from, to, duration), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
