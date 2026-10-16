@@ -1,5 +1,6 @@
 package snownee.spacefold.client.sky;
 
+import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -7,6 +8,7 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.jspecify.annotations.Nullable;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -48,7 +50,9 @@ import snownee.spacefold.SpaceFold;
  * {@link #SPRITE_COUNT} / 尺寸 / 贴图 alpha 的具体取值来权衡。
  */
 public final class FogVolume {
-	/** 自定义管线：POSITION_TEX_COLOR + 半透明混合、只测深度不写深度、不剔除 + 一张贴图。 */
+	/**
+	 * 自定义管线：POSITION_TEX_COLOR + 半透明混合、只测深度不写深度、不剔除 + 一张贴图。
+	 */
 	public static final RenderPipeline PIPELINE = RenderPipelines.register(
 			RenderPipeline.builder(RenderPipelines.MATRICES_PROJECTION_SNIPPET)
 					.withLocation(SpaceFold.id("pipeline/spacefold_fog"))
@@ -63,37 +67,59 @@ public final class FogVolume {
 	);
 	private static final Identifier TEXTURE = SpaceFold.id("textures/environment/fog.png");
 	private static final Vector3f WORLD_UP = new Vector3f(0.0F, 1.0F, 0.0F);
-	/** 雾团数量。GPU 的 overdraw 与之正相关，是首要的性能旋钮。 */
+	/**
+	 * 雾团数量。GPU 的 overdraw 与之正相关，是首要的性能旋钮。
+	 */
 	private static final int SPRITE_COUNT = 96;
-	/** 雾团中心到相机的距离范围（格），保证雾只出现在"远处"。 */
+	/**
+	 * 雾团中心到相机的距离范围（格），保证雾只出现在"远处"。
+	 */
 	private static final float MIN_DISTANCE = 160.0F;
 	private static final float MAX_DISTANCE = 520.0F;
-	/** 雾团世界尺寸范围（格，取宽度）。 */
+	/**
+	 * 雾团世界尺寸范围（格，取宽度）。
+	 */
 	private static final float MIN_SIZE = 140.0F;
 	private static final float MAX_SIZE = 360.0F;
-	/** 高度 / 宽度，越大越接近正方形。 */
+	/**
+	 * 高度 / 宽度，越大越接近正方形。
+	 */
 	private static final float ASPECT = 0.55F;
-	/** 雾团中心仰角范围（弧度）：主要贴着地平线。 */
+	/**
+	 * 雾团中心仰角范围（弧度）：主要贴着地平线。
+	 */
 	private static final float MIN_ELEVATION = -0.40F;
 	private static final float MAX_ELEVATION = 0.18F;
-	/** 单个雾团的顶点色不透明度上限（再乘以贴图自身的 alpha）。 */
+	/**
+	 * 单个雾团的顶点色不透明度上限（再乘以贴图自身的 alpha）。
+	 */
 	private static final float BASE_ALPHA = 0.18F;
-	/** 雾的颜色（不含 alpha），比维度雾色略亮，才能在漆黑虚空中被看见。 */
+	/**
+	 * 雾的颜色（不含 alpha），比维度雾色略亮，才能在漆黑虚空中被看见。
+	 */
 	private static final int MIST_RGB = 0x464676;
-	/** 整体缓慢漂移（弧度 / 刻），让雾团横过天空。 */
+	/**
+	 * 整体缓慢漂移（弧度 / 刻），让雾团横过天空。
+	 */
 	private static final float DRIFT_RADIANS_PER_TICK = 0.0001F;
-	/** 每个雾团 4 个顶点。 */
+	/**
+	 * 每个雾团 4 个顶点。
+	 */
 	private static final int VERTICES_PER_SPRITE = 4;
 
-	/** 一次性构建的静态顶点缓冲（世界方向上的雾团）。 */
-	private static GpuBuffer vertexBuffer;
-	private static GpuBuffer indexBuffer;
+	/**
+	 * 一次性构建的静态顶点缓冲（世界方向上的雾团）。
+	 */
+	private static @Nullable GpuBuffer vertexBuffer;
+	private static @Nullable GpuBuffer indexBuffer;
 	private static boolean built;
 
 	private FogVolume() {
 	}
 
-	/** 由 {@code ClientProxy} 在客户端初始化时调用，确保管线随其它管线一起预编译。 */
+	/**
+	 * 由 {@code ClientProxy} 在客户端初始化时调用，确保管线随其它管线一起预编译。
+	 */
 	public static void init() {
 	}
 
@@ -109,7 +135,7 @@ public final class FogVolume {
 		}
 
 		Minecraft minecraft = Minecraft.getInstance();
-		ClientLevel level = minecraft.level;
+		ClientLevel level = Objects.requireNonNull(minecraft.level);
 		float drift = (level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false)) * DRIFT_RADIANS_PER_TICK;
 
 		Matrix4fStack modelViewStack = RenderSystem.getModelViewStack();
@@ -122,21 +148,29 @@ public final class FogVolume {
 		AbstractTexture texture = minecraft.getTextureManager().getTexture(TEXTURE);
 		GpuTextureView colorTexture = SkyTarget.color(minecraft);
 		GpuTextureView depthTexture = SkyTarget.depth(minecraft);
-		try (RenderPass renderPass = RenderSystem.getDevice()
-				.createCommandEncoder()
-				.createRenderPass(() -> "SpaceFold fog volume", colorTexture, OptionalInt.empty(), depthTexture, OptionalDouble.empty())) {
+		try (
+				RenderPass renderPass = RenderSystem.getDevice()
+						.createCommandEncoder()
+						.createRenderPass(
+								() -> "SpaceFold fog volume",
+								colorTexture,
+								OptionalInt.empty(),
+								depthTexture,
+								OptionalDouble.empty())) {
 			renderPass.setPipeline(PIPELINE);
 			RenderSystem.bindDefaultUniforms(renderPass);
 			renderPass.setUniform("DynamicTransforms", dynamicTransforms);
 			renderPass.bindTexture("Sampler0", texture.getTextureView(), texture.getSampler());
-			renderPass.setVertexBuffer(0, vertexBuffer);
-			renderPass.setIndexBuffer(indexBuffer, RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).type());
+			renderPass.setVertexBuffer(0, Objects.requireNonNull(vertexBuffer));
+			renderPass.setIndexBuffer(Objects.requireNonNull(indexBuffer), RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).type());
 			renderPass.drawIndexed(0, 0, SPRITE_COUNT * 6, 1);
 		}
 		modelViewStack.popMatrix();
 	}
 
-	/** 一次性构建并上传静态雾团网格与索引缓冲。 */
+	/**
+	 * 一次性构建并上传静态雾团网格与索引缓冲。
+	 */
 	private static void build() {
 		VertexFormat format = DefaultVertexFormat.POSITION_TEX_COLOR;
 		int capacity = format.getVertexSize() * SPRITE_COUNT * VERTICES_PER_SPRITE;
@@ -170,7 +204,10 @@ public final class FogVolume {
 
 			try (MeshData mesh = builder.buildOrThrow()) {
 				vertexBuffer = RenderSystem.getDevice()
-						.createBuffer(() -> "SpaceFold fog volume vertices", GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST, mesh.vertexBuffer());
+						.createBuffer(
+								() -> "SpaceFold fog volume vertices",
+								GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_COPY_DST,
+								mesh.vertexBuffer());
 			}
 		}
 		indexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS).getBuffer(SPRITE_COUNT * 6);
@@ -181,12 +218,16 @@ public final class FogVolume {
 		builder.addVertex(position.x, position.y, position.z).setUv(u, v).setColor(color);
 	}
 
-	/** 用给定 alpha 合成雾色（颜色通道固定，透明度决定浓淡）。 */
+	/**
+	 * 用给定 alpha 合成雾色（颜色通道固定，透明度决定浓淡）。
+	 */
 	private static int alphaColor(float alpha) {
 		return ((int) (alpha * 255.0F) << 24) | MIST_RGB;
 	}
 
-	/** SplitMix64 哈希：把雾团序号映射为稳定的 64 位种子。 */
+	/**
+	 * SplitMix64 哈希：把雾团序号映射为稳定的 64 位种子。
+	 */
 	private static long mix(long value) {
 		long x = value + 0x9E3779B97F4A7C15L;
 		x = (x ^ (x >>> 30)) * 0xBF58476D1CE4E5B9L;

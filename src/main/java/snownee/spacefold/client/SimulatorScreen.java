@@ -1,11 +1,12 @@
 package snownee.spacefold.client;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
@@ -32,12 +33,12 @@ public class SimulatorScreen extends Screen implements MenuAccess<SimulatorMenu>
 	private static final int PREVIEW = 128;
 	private static final float PREVIEW_PITCH = 25.0F;
 
-	private static final Map<Integer, SimulationResult> PENDING_RESULTS = new HashMap<>();
+	private static final Int2ObjectMap<@Nullable SimulationResult> PENDING_RESULTS = new Int2ObjectOpenHashMap<>();
 
 	private final SimulatorMenu menu;
-	private Button teleportButton;
-	private Button simulateButton;
-	private Button pinButton;
+	private @Nullable Button teleportButton;
+	private @Nullable Button simulateButton;
+	private @Nullable Button pinButton;
 	private @Nullable SimulationResult lastResult;
 	private int buttonsY;
 	private float previewYaw = PreviewCache.DEFAULT_YAW;
@@ -207,14 +208,14 @@ public class SimulatorScreen extends Screen implements MenuAccess<SimulatorMenu>
 
 	private void updateButtons() {
 		SimulationManager.RoomStatus status = menu.roomStatus();
-		teleportButton.active = status != SimulationManager.RoomStatus.RUNNING;
+		Objects.requireNonNull(teleportButton).active = status != SimulationManager.RoomStatus.RUNNING;
 		if (menu.roomIndex() < 0) {
-			simulateButton.active = false;
+			Objects.requireNonNull(simulateButton).active = false;
 			simulateButton.setTooltip(null);
 			return;
 		}
 		boolean ready = status == SimulationManager.RoomStatus.READY;
-		simulateButton.active = ready;
+		Objects.requireNonNull(simulateButton).active = ready;
 		if (!ready) {
 			Tooltip reason = Tooltip.create(reason(status, menu.cooldownSeconds()));
 			simulateButton.setTooltip(reason);
@@ -248,7 +249,7 @@ public class SimulatorScreen extends Screen implements MenuAccess<SimulatorMenu>
 	}
 
 	private void press(int buttonId) {
-		this.minecraft.gameMode.handleInventoryButtonClick(this.menu.containerId, buttonId);
+		Objects.requireNonNull(this.minecraft.gameMode).handleInventoryButtonClick(this.menu.containerId, buttonId);
 	}
 
 	@Override
@@ -258,7 +259,7 @@ public class SimulatorScreen extends Screen implements MenuAccess<SimulatorMenu>
 
 	@Override
 	public void onClose() {
-		this.minecraft.player.closeContainer();
+		Objects.requireNonNull(this.minecraft.player).closeContainer();
 		super.onClose();
 	}
 

@@ -159,19 +159,19 @@ public class RepeaterBlock extends DirectionalBlock implements EntityBlock, IKiw
 	}
 
 	@Override
-	public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity placer, ItemStack stack) {
-		super.setPlacedBy(level, pos, state, placer, stack);
+	public void setPlacedBy(Level level, BlockPos pos, BlockState state, @Nullable LivingEntity by, ItemStack itemStack) {
+		super.setPlacedBy(level, pos, state, by, itemStack);
 		if (level.isClientSide()) {
 			return;
 		}
 		if (!(level.getBlockEntity(pos) instanceof RepeaterBlockEntity blockEntity)) {
 			return;
 		}
-		SimulationResult result = stack.get(CoreModule.SIMULATION_RESULT.get());
+		SimulationResult result = itemStack.get(CoreModule.SIMULATION_RESULT.get());
 		if (result != null) {
 			blockEntity.setResult(result);
 		}
-		RepeaterPaints paints = stack.get(CoreModule.REPEATER_PAINT.get());
+		RepeaterPaints paints = itemStack.get(CoreModule.REPEATER_PAINT.get());
 		if (paints != null && !paints.isEmpty()) {
 			blockEntity.setPaints(paints);
 		}

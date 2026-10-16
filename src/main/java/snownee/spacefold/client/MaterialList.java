@@ -41,8 +41,8 @@ public class MaterialList extends SmoothScrollableList<MaterialList.MaterialRow>
 
 	private final boolean showProgress;
 
-	public MaterialList(Minecraft minecraft, List<SViewDetailsPacket.Entry> data, boolean showProgress) {
-		super(minecraft, ROW_WIDTH, CELL_HEIGHT, 0, CELL_HEIGHT);
+	public MaterialList(Minecraft client, List<SViewDetailsPacket.Entry> data, boolean showProgress) {
+		super(client, ROW_WIDTH, CELL_HEIGHT, 0, CELL_HEIGHT);
 		this.showProgress = showProgress;
 		if (data.isEmpty()) {
 			addEntry(new MaterialRow(List.of()));
@@ -215,7 +215,7 @@ public class MaterialList extends SmoothScrollableList<MaterialList.MaterialRow>
 		}
 
 		@Override
-		public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+		public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
 			armed = false;
 			return false;
 		}

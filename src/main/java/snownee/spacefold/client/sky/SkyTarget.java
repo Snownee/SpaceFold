@@ -1,5 +1,7 @@
 package snownee.spacefold.client.sky;
 
+import java.util.Objects;
+
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTextureView;
 
@@ -16,12 +18,12 @@ public final class SkyTarget {
 	public static GpuTextureView color(Minecraft minecraft) {
 		return RenderSystem.outputColorTextureOverride != null
 				? RenderSystem.outputColorTextureOverride
-				: minecraft.getMainRenderTarget().getColorTextureView();
+				: Objects.requireNonNull(minecraft.getMainRenderTarget().getColorTextureView());
 	}
 
 	public static GpuTextureView depth(Minecraft minecraft) {
 		return RenderSystem.outputDepthTextureOverride != null
 				? RenderSystem.outputDepthTextureOverride
-				: minecraft.getMainRenderTarget().getDepthTextureView();
+				: Objects.requireNonNull(minecraft.getMainRenderTarget().getDepthTextureView());
 	}
 }

@@ -3,6 +3,7 @@ package snownee.spacefold.client.room;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.IntFunction;
 
@@ -46,7 +47,7 @@ public final class RadialGraphLayout {
 		return root;
 	}
 
-	public void reset(int rootSnapshotId, int rootTier, ItemStack rootIcon, IntFunction<List<ItemStack>> childrenLookup) {
+	public void reset(int rootSnapshotId, int rootTier, ItemStack rootIcon, IntFunction<@Nullable List<ItemStack>> childrenLookup) {
 		nodes.clear();
 		visitedSnapshotIds.clear();
 		root = new Node(null, rootSnapshotId, rootTier, rootIcon);
@@ -65,7 +66,7 @@ public final class RadialGraphLayout {
 	 * 为所有尚未展开的结点挂载其子结点。childrenLookup 对给定快照返回子（repeater 复制物品）；
 	 * 返回 null 表示对应快照尚未加载（留待下次重试），返回空列表表示已加载但无子结点。
 	 */
-	public boolean expandPending(IntFunction<List<ItemStack>> childrenLookup) {
+	public boolean expandPending(IntFunction<@Nullable List<ItemStack>> childrenLookup) {
 		boolean changed = false;
 		for (int index = 0; index < nodes.size(); index++) {
 			Node node = nodes.get(index);
@@ -147,7 +148,7 @@ public final class RadialGraphLayout {
 			removeSubtree(child);
 		}
 		nodes.remove(node);
-		node.parent.children.remove(node);
+		Objects.requireNonNull(node.parent).children.remove(node);
 	}
 
 	private void structureChanged() {
@@ -237,6 +238,7 @@ public final class RadialGraphLayout {
 	}
 
 	private void applyGravity() {
+		Node root = Objects.requireNonNull(this.root);
 		float k = alpha * gravity;
 		for (Node node : nodes) {
 			node.x += (root.x - node.x) * k;

@@ -1,5 +1,9 @@
 package snownee.spacefold.client;
 
+import java.util.Objects;
+
+import org.jspecify.annotations.Nullable;
+
 import com.mojang.blaze3d.platform.InputConstants;
 
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
@@ -9,7 +13,6 @@ import net.minecraft.util.Mth;
 import net.minecraft.util.Util;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
-import org.jspecify.annotations.Nullable;
 import snownee.kiwi.network.KPacketSender;
 import snownee.spacefold.CoreModule;
 import snownee.spacefold.SpaceFold;
@@ -22,7 +25,7 @@ import snownee.spacefold.network.SViewDetailsPacket;
 public final class ViewDetailsKey {
 	private static final int HOLD_MILLIS = 450;
 
-	public static KeyMapping KEY;
+	public static @Nullable KeyMapping KEY;
 
 	private static long holdStart = -1;
 
@@ -37,7 +40,7 @@ public final class ViewDetailsKey {
 	}
 
 	public static boolean isDown() {
-		InputConstants.Key key = KeyMappingHelper.getBoundKeyOf(KEY);
+		InputConstants.Key key = KeyMappingHelper.getBoundKeyOf(Objects.requireNonNull(KEY));
 		if (key.getType() == InputConstants.Type.KEYSYM) {
 			return InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), key.getValue());
 		}
@@ -60,7 +63,9 @@ public final class ViewDetailsKey {
 				return;
 			}
 			if (consumeHold()) {
-				minecraft.gameMode.handleInventoryButtonClick(factoryScreen.getMenu().containerId, FactoryMenu.BUTTON_MATERIALS);
+				Objects.requireNonNull(minecraft.gameMode).handleInventoryButtonClick(
+						factoryScreen.getMenu().containerId,
+						FactoryMenu.BUTTON_MATERIALS);
 			}
 			return;
 		}
@@ -87,7 +92,7 @@ public final class ViewDetailsKey {
 			int configSlot = inPlayerInventory && RepeaterMenu.canConfigure(minecraft.player, stack)
 					? hoveredSlot.getContainerSlot()
 					: -1;
-			minecraft.player.closeContainer();
+			Objects.requireNonNull(minecraft.player).closeContainer();
 			minecraft.setScreen(new DetailsScreen(
 					SViewDetailsPacket.entriesFrom(stack),
 					false,

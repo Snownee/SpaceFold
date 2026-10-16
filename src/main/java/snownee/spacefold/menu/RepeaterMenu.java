@@ -54,14 +54,14 @@ public class RepeaterMenu extends AbstractContainerMenu {
 	}
 
 	@Override
-	public ItemStack quickMoveStack(Player player, int index) {
-		Slot slot = slots.get(index);
+	public ItemStack quickMoveStack(Player player, int slotIndex) {
+		Slot slot = slots.get(slotIndex);
 		if (!slot.hasItem()) {
 			return ItemStack.EMPTY;
 		}
 		ItemStack stack = slot.getItem();
 		ItemStack copy = stack.copy();
-		if (index < SIZE) {
+		if (slotIndex < SIZE) {
 			if (!moveItemStackTo(stack, SIZE, slots.size(), true)) {
 				return ItemStack.EMPTY;
 			}

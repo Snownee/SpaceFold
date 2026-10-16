@@ -145,14 +145,14 @@ public class CubeParticleRenderState implements ParticleGroupRenderState {
 	}
 
 	@Override
-	public void submit(SubmitNodeCollector collector, CameraRenderState camera) {
+	public void submit(SubmitNodeCollector submitNodeCollector, CameraRenderState camera) {
 		if (this.count == 0) {
 			return;
 		}
 		double camX = camera.pos.x;
 		double camY = camera.pos.y;
 		double camZ = camera.pos.z;
-		collector.submitCustomGeometry(
+		submitNodeCollector.submitCustomGeometry(
 				new PoseStack(), CubeRenderType.TYPE, (pose, buffer) -> {
 					for (int i = 0; i < this.count; i++) {
 						int argb = ((int) (this.alphas[i] * 255.0F) << 24) | (this.colors[i] & 0xFFFFFF);

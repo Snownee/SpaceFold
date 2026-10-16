@@ -1,5 +1,6 @@
 package snownee.spacefold.client.sky;
 
+import java.util.Objects;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 
@@ -7,6 +8,7 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.jspecify.annotations.Nullable;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -76,7 +78,7 @@ public final class ShootingStars {
 	private static final int MAX_METEORS = LIFETIME_TICKS + 1;
 
 	/** 复用型顶点缓冲，按最大用量一次性分配，避免每帧创建/销毁 GPU 缓冲。 */
-	private static GpuBuffer vertexBuffer;
+	private static @Nullable GpuBuffer vertexBuffer;
 
 	private ShootingStars() {
 	}
@@ -93,7 +95,7 @@ public final class ShootingStars {
 			return;
 		}
 		Minecraft minecraft = Minecraft.getInstance();
-		ClientLevel level = minecraft.level;
+		ClientLevel level = Objects.requireNonNull(minecraft.level);
 		// 渲染时刻 = 整刻 + 亚刻插值，保证移动平滑；两个维度共用同一 gameTime，故镜像一致。
 		double time = level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
 		long nowTick = (long) Math.floor(time);

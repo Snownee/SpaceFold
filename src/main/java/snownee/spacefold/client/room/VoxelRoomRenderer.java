@@ -1,8 +1,7 @@
 package snownee.spacefold.client.room;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
 
 import org.joml.Matrix4fc;
 import org.jspecify.annotations.Nullable;
@@ -15,6 +14,9 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.fabricmc.fabric.api.client.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.client.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.client.renderer.v1.render.AltModelBlockRenderer;
@@ -66,10 +68,17 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 	private static final CardinalLighting FLAT_LIGHT = new CardinalLighting(1.0F, 1.0F, 1.0F, 1.0F, 1.0F, 1.0F);
 	private static final int LIGHT = 0xF000F0;
 
-	private static final Map<Integer, BlockEntity> BE_CACHE = new HashMap<>();
+	private static final Int2ObjectMap<BlockEntity> BE_CACHE = new Int2ObjectOpenHashMap<>();
 	private static int beCacheSnapshotId = Integer.MIN_VALUE;
 	private static int beCacheContentVersion = Integer.MIN_VALUE;
 	private static @Nullable Level beCacheLevel;
+
+	public static void clearCache() {
+		BE_CACHE.clear();
+		beCacheSnapshotId = Integer.MIN_VALUE;
+		beCacheContentVersion = Integer.MIN_VALUE;
+		beCacheLevel = null;
+	}
 
 	private @Nullable AltModelBlockRenderer blockRenderer;
 	private @Nullable ContentKey cachedContentKey;
@@ -92,7 +101,7 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 	protected void blitTexture(VoxelRoomRenderState state, GuiRenderState guiRenderState) {
 		int a = Mth.clamp(Math.round(state.alpha() * 255.0F), 0, 255);
 		int color = (a << 24) | (a << 16) | (a << 8) | a;
-		GpuTextureView textureView = ((PictureInPictureRendererAccessor) this).spacefold$textureView();
+		GpuTextureView textureView = Objects.requireNonNull(((PictureInPictureRendererAccessor) this).spacefold$textureView());
 		guiRenderState.addBlitToCurrentLayer(new BlitRenderState(
 				RenderPipelines.GUI_TEXTURED_PREMULTIPLIED_ALPHA,
 				TextureSetup.singleTexture(textureView, RenderSystem.getSamplerCache().getRepeat(FilterMode.NEAREST)),
@@ -125,7 +134,7 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 
 		Level level = minecraft.level;
 		BlockEntityRenderDispatcher dispatcher = minecraft.getBlockEntityRenderDispatcher();
-		Map<Integer, BlockEntity> blockEntities = level == null ? Map.of() : blockEntities(state, level, dispatcher);
+		Int2ObjectMap<@Nullable BlockEntity> blockEntities = level == null ? Int2ObjectMaps.emptyMap() : blockEntities(state, level, dispatcher);
 		CameraRenderState camera = new CameraRenderState();
 		camera.pos = Vec3.ZERO;
 		camera.initialized = true;
@@ -192,7 +201,7 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 		}
 	}
 
-	private static Map<Integer, BlockEntity> blockEntities(
+	private static Int2ObjectMap<@Nullable BlockEntity> blockEntities(
 			VoxelRoomRenderState state,
 			Level level,
 			BlockEntityRenderDispatcher dispatcher) {
@@ -201,8 +210,8 @@ public class VoxelRoomRenderer extends PictureInPictureRenderer<VoxelRoomRenderS
 		}
 		BE_CACHE.clear();
 		int size = state.size();
-		for (Map.Entry<Integer, CompoundTag> entry : state.blockEntities().entrySet()) {
-			int index = entry.getKey();
+		for (Int2ObjectMap.Entry<CompoundTag> entry : state.blockEntities().int2ObjectEntrySet()) {
+			int index = entry.getIntKey();
 			int x = index % size;
 			int y = (index / size) % size;
 			int z = index / (size * size);

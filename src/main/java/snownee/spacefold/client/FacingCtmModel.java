@@ -5,6 +5,8 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import org.jspecify.annotations.Nullable;
+
 import com.google.gson.JsonObject;
 
 import earth.terrarium.athena.api.client.models.AthenaBlockModel;
@@ -42,15 +44,19 @@ public class FacingCtmModel implements AthenaBlockModel {
 	}
 
 	@Override
-	public List<AthenaQuad> getQuads(AppearanceAndTintGetter level, BlockState state, BlockPos pos, Direction direction) {
-		if (direction != state.getValue(DirectionalBlock.FACING)) {
+	public List<AthenaQuad> getQuads(
+			AppearanceAndTintGetter level,
+			BlockState blockState,
+			BlockPos blockPos,
+			Direction direction) {
+		if (direction != blockState.getValue(DirectionalBlock.FACING)) {
 			return List.of();
 		}
-		return delegate.getQuads(level, state, pos, direction);
+		return delegate.getQuads(level, blockState, blockPos, direction);
 	}
 
 	@Override
-	public Map<Direction, List<AthenaQuad>> getDefaultQuads(Direction direction) {
+	public Map<Direction, List<AthenaQuad>> getDefaultQuads(@Nullable Direction direction) {
 		if (direction != Direction.NORTH) {
 			return Object2ObjectMaps.emptyMap();
 		}

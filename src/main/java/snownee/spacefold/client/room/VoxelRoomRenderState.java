@@ -2,13 +2,13 @@ package snownee.spacefold.client.room;
 
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.joml.Matrix3x2f;
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -23,7 +23,7 @@ import snownee.spacefold.dim.RoomSnapshot;
 
 public record VoxelRoomRenderState(
 		List<BlockState> blocks,
-		Map<Integer, CompoundTag> blockEntities,
+		Int2ObjectMap<CompoundTag> blockEntities,
 		int size,
 		int snapshotId,
 		int version,
@@ -39,7 +39,7 @@ public record VoxelRoomRenderState(
 		@Nullable ScreenRectangle bounds) implements PictureInPictureRenderState {
 	public VoxelRoomRenderState(
 			List<BlockState> blocks,
-			Map<Integer, CompoundTag> blockEntities,
+			Int2ObjectMap<CompoundTag> blockEntities,
 			int size,
 			int snapshotId,
 			int version,
@@ -136,7 +136,7 @@ public record VoxelRoomRenderState(
 			return null;
 		}
 		List<BlockState> blocks = flatten(snapshot);
-		Map<Integer, CompoundTag> blockEntities = new HashMap<>();
+		Int2ObjectMap<CompoundTag> blockEntities = new Int2ObjectOpenHashMap<>();
 		for (RoomSnapshot.Entry entry : snapshot.blocks()) {
 			entry.nbt().ifPresent(nbt -> blockEntities.put(index(entry, snapshot.size()), nbt));
 		}

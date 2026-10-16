@@ -4,8 +4,11 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+
+import org.jspecify.annotations.Nullable;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
@@ -37,13 +40,13 @@ public final class PaintAtlas {
 	private final Map<PixelKey, Slot> slots = new ConcurrentHashMap<>();
 	private final Set<PixelKey> pending = ConcurrentHashMap.newKeySet();
 	private final Set<Long> dirtySections = ConcurrentHashMap.newKeySet();
-	private final Slot[] grid = new Slot[SLOTS];
+	private final @Nullable Slot[] grid = new Slot[SLOTS];
 
 	private volatile int version;
 	private boolean fullRemesh;
 	private long tickCounter;
 	private boolean ready;
-	private GpuTexture texture;
+	private @Nullable GpuTexture texture;
 	private int baseX;
 	private int baseY;
 	private int atlasWidth;
@@ -78,7 +81,7 @@ public final class PaintAtlas {
 		return version;
 	}
 
-	public TextureAtlasSprite sprite(FacePaint paint) {
+	public @Nullable TextureAtlasSprite sprite(FacePaint paint) {
 		PixelKey key = new PixelKey(paint.pixels());
 		Slot slot = slots.get(key);
 		if (slot != null) {
@@ -134,8 +137,7 @@ public final class PaintAtlas {
 		if (!ready) {
 			throw new IOException("Paint atlas is not ready yet");
 		}
-		NativeImage image = new NativeImage(RESERVED_SIZE, RESERVED_SIZE, true);
-		try {
+		try (NativeImage image = new NativeImage(RESERVED_SIZE, RESERVED_SIZE, true)) {
 			for (Slot slot : grid) {
 				if (slot == null || slot.image == null) {
 					continue;
@@ -149,8 +151,6 @@ public final class PaintAtlas {
 				}
 			}
 			image.writeToFile(path);
-		} finally {
-			image.close();
 		}
 	}
 
@@ -227,7 +227,7 @@ public final class PaintAtlas {
 		if (lru < 0) {
 			return -1;
 		}
-		Slot evicted = grid[lru];
+		Slot evicted = Objects.requireNonNull(grid[lru]);
 		slots.remove(evicted.key);
 		if (evicted.sprite != null) {
 			evicted.sprite.close();
@@ -273,7 +273,17 @@ public final class PaintAtlas {
 				continue;
 			}
 			NativeImage image = width == STRIDE && height == STRIDE ? physical : downsample(physical, width, height);
-			RenderSystem.getDevice().createCommandEncoder().writeToTexture(texture, image, level, 0, x0, y0, width, height, 0, 0);
+			RenderSystem.getDevice().createCommandEncoder().writeToTexture(
+					Objects.requireNonNull(texture),
+					image,
+					level,
+					0,
+					x0,
+					y0,
+					width,
+					height,
+					0,
+					0);
 			if (image != physical) {
 				image.close();
 			}
@@ -282,7 +292,7 @@ public final class PaintAtlas {
 	}
 
 	private TextureAtlasSprite createSprite(Slot slot) {
-		SpriteContents contents = new SpriteContents(RESERVED, new FrameSize(SIZE, SIZE), slot.image);
+		SpriteContents contents = new SpriteContents(RESERVED, new FrameSize(SIZE, SIZE), Objects.requireNonNull(slot.image));
 		return TextureAtlasSpriteInvoker.spacefold$create(
 				TextureAtlas.LOCATION_BLOCKS,
 				contents,
@@ -298,8 +308,8 @@ public final class PaintAtlas {
 		final int x;
 		final int y;
 		final PixelKey key;
-		TextureAtlasSprite sprite;
-		NativeImage image;
+		@Nullable TextureAtlasSprite sprite;
+		@Nullable NativeImage image;
 		volatile long lastUse;
 
 		Slot(int index, int x, int y, PixelKey key) {

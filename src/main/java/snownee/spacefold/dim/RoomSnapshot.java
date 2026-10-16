@@ -155,7 +155,7 @@ public class RoomSnapshot extends SavedData {
 			}
 			results.add(stack);
 		}
-		results.sort(Comparator.comparingInt((ItemStack stack) -> stack.get(CoreModule.SIMULATION_RESULT.get()).tier()).reversed());
+		results.sort(Comparator.comparingInt((ItemStack stack) -> Objects.requireNonNull(stack.get(CoreModule.SIMULATION_RESULT.get())).tier()).reversed());
 		if (results.size() > 100) {
 			return new ArrayList<>(results.subList(0, 100));
 		}

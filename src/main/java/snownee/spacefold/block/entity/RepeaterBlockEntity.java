@@ -557,7 +557,7 @@ public class RepeaterBlockEntity extends ModBlockEntity implements Nameable {
 					continue;
 				}
 				T resource = entry.getKey();
-				views.add(new StorageView<T>() {
+				views.add(new StorageView<>() {
 					@Override
 					public long extract(T extracted, long maxAmount, TransactionContext transaction) {
 						if (!output) {

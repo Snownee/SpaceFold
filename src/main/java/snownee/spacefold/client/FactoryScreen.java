@@ -2,6 +2,7 @@ package snownee.spacefold.client;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import com.mojang.blaze3d.platform.InputConstants;
 
@@ -77,7 +78,7 @@ public class FactoryScreen extends AbstractContainerScreen<FactoryMenu> {
 	@Override
 	public boolean keyPressed(KeyEvent event) {
 		if (event.key() == InputConstants.KEY_SPACE && minecraft.player != null && minecraft.player.isCreative()) {
-			minecraft.gameMode.handleInventoryButtonClick(menu.containerId, FactoryMenu.BUTTON_CREATE);
+			Objects.requireNonNull(minecraft.gameMode).handleInventoryButtonClick(menu.containerId, FactoryMenu.BUTTON_CREATE);
 			return true;
 		}
 		return super.keyPressed(event);

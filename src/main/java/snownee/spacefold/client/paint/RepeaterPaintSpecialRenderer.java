@@ -85,7 +85,7 @@ public class RepeaterPaintSpecialRenderer implements SpecialModelRenderer<Repeat
 	public void submit(
 			@Nullable Argument argument,
 			PoseStack poseStack,
-			SubmitNodeCollector collector,
+			SubmitNodeCollector submitNodeCollector,
 			int lightCoords,
 			int overlayCoords,
 			boolean hasFoil,
@@ -98,7 +98,7 @@ public class RepeaterPaintSpecialRenderer implements SpecialModelRenderer<Repeat
 			FacePaint paint = entry.getValue();
 			TextureAtlasSprite sprite = PaintAtlas.get().sprite(paint);
 			if (sprite != null) {
-				submitFace(poseStack, collector, lightCoords, face, paint.rotation(), sprite);
+				submitFace(poseStack, submitNodeCollector, lightCoords, face, paint.rotation(), sprite);
 			}
 		}
 	}

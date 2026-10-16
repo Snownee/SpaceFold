@@ -1,5 +1,7 @@
 package snownee.spacefold.client.room;
 
+import java.util.Objects;
+
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 
@@ -74,7 +76,7 @@ public class RoomSkyRenderer extends PictureInPictureRenderer<RoomSkyRenderState
 		modelViewStack.identity();
 
 		Minecraft minecraft = Minecraft.getInstance();
-		double time = minecraft.level.getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
+		double time = Objects.requireNonNull(minecraft.level).getGameTime() + minecraft.getDeltaTracker().getGameTimeDeltaPartialTick(false);
 		// 先把时间对自转周期取模，避免 gameTime 很大时 float 精度不足导致角度停滞。
 		double driftPeriod = Mth.TWO_PI / STAR_DRIFT_RADIANS_PER_TICK;
 		float starDrift = (float) (time % driftPeriod * STAR_DRIFT_RADIANS_PER_TICK);

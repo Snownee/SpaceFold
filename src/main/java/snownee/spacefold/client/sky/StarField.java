@@ -8,6 +8,7 @@ import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
+import org.jspecify.annotations.Nullable;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -35,7 +36,7 @@ import net.minecraft.util.RandomSource;
  */
 public final class StarField {
 	private static final int STAR_COUNT = 1500;
-	private static GpuBuffer vertexBuffer;
+	private static @Nullable GpuBuffer vertexBuffer;
 	private static int indexCount;
 
 	private StarField() {

@@ -2,7 +2,6 @@ package snownee.spacefold.dim;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -14,10 +13,13 @@ import java.util.function.Predicate;
 
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import it.unimi.dsi.fastutil.objects.Object2LongMap;
 import it.unimi.dsi.fastutil.objects.Object2LongOpenHashMap;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.transfer.v1.fluid.FluidVariant;
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
@@ -63,7 +65,7 @@ public final class SimulationManager {
 	private static final double WARMUP_FRACTION = 0.25;
 	private static final double TRAILING_FRACTION = 0.25;
 
-	private static final Map<Integer, Session> ACTIVE = new HashMap<>();
+	private static final Int2ObjectMap<Session> ACTIVE = new Int2ObjectOpenHashMap<>();
 
 	private static long serverTicks;
 	private static long simTime;
@@ -74,6 +76,14 @@ public final class SimulationManager {
 
 	public static void init() {
 		ServerTickEvents.END_SERVER_TICK.register(SimulationManager::onServerTick);
+		ServerLifecycleEvents.SERVER_STOPPED.register(server -> reset());
+	}
+
+	public static void reset() {
+		ACTIVE.clear();
+		serverTicks = 0;
+		simTime = 0;
+		copyTriggerOffset = 0;
 	}
 
 	public static long gameTime() {
@@ -136,6 +146,7 @@ public final class SimulationManager {
 				new Warmup(),
 				new Counted());
 		Session previous = ACTIVE.put(room, session);
+		//noinspection ConstantValue
 		if (previous != null) {
 			setChunksLoaded(simulate.getServer(), previous, false);
 		}
@@ -328,13 +339,15 @@ public final class SimulationManager {
 			return;
 		}
 		long now = simulate.getGameTime();
-		Iterator<Map.Entry<Integer, Session>> iterator = ACTIVE.entrySet().iterator();
+		Iterator<Int2ObjectMap.Entry<Session>> iterator = ACTIVE.int2ObjectEntrySet().iterator();
 		while (iterator.hasNext()) {
-			Map.Entry<Integer, Session> entry = iterator.next();
-			advancePhases(entry.getValue());
-			if (now >= entry.getValue().endTime()) {
+			Int2ObjectMap.Entry<Session> entry = iterator.next();
+			int room = entry.getIntKey();
+			Session session = entry.getValue();
+			advancePhases(session);
+			if (now >= session.endTime()) {
 				iterator.remove();
-				end(server, simulate, entry.getKey(), entry.getValue());
+				end(server, simulate, room, session);
 			}
 		}
 		serverTicks++;
@@ -344,8 +357,8 @@ public final class SimulationManager {
 	}
 
 	private static void broadcast(MinecraftServer server, ServerLevel simulate, long now) {
-		for (Map.Entry<Integer, Session> active : ACTIVE.entrySet()) {
-			int room = active.getKey();
+		for (Int2ObjectMap.Entry<Session> active : ACTIVE.int2ObjectEntrySet()) {
+			int room = active.getIntKey();
 			Session session = active.getValue();
 			send(server, simulate, session, room, packet(session, now));
 		}

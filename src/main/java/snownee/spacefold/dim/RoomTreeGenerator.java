@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 import net.minecraft.core.BlockPos;
@@ -155,7 +156,7 @@ public final class RoomTreeGenerator {
 			CompoundTag nbt = new CompoundTag();
 			nbt.putString(
 					"id",
-					BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(CoreModule.REPEATER_BE.get()).toString());
+					Objects.requireNonNull(BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(CoreModule.REPEATER_BE.get())).toString());
 			nbt.put("result", SimulationResult.CODEC.encodeStart(ops, results[childNodes.get(i)]).getOrThrow());
 			addBlock(
 					palette,

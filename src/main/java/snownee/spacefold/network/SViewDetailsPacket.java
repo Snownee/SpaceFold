@@ -2,6 +2,7 @@ package snownee.spacefold.network;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 import net.fabricmc.fabric.api.transfer.v1.item.ItemVariant;
 import net.minecraft.client.Minecraft;
@@ -64,7 +65,7 @@ public record SViewDetailsPacket(List<Entry> entries, boolean showProgress, int 
 		public void handle(SViewDetailsPacket packet, PayloadContext context) {
 			context.execute(() -> {
 				Minecraft minecraft = Minecraft.getInstance();
-				minecraft.player.closeContainer();
+				Objects.requireNonNull(minecraft.player).closeContainer();
 				minecraft.setScreen(new DetailsScreen(
 						packet.entries(),
 						packet.showProgress(),

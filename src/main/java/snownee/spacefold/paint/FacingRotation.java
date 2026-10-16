@@ -100,10 +100,9 @@ public final class FacingRotation {
 	private static Direction baseRight(Direction face) {
 		return switch (face) {
 			case NORTH -> Direction.WEST;
-			case SOUTH -> Direction.EAST;
+			case SOUTH, UP, DOWN -> Direction.EAST;
 			case WEST -> Direction.SOUTH;
 			case EAST -> Direction.NORTH;
-			case UP, DOWN -> Direction.EAST;
 		};
 	}
 

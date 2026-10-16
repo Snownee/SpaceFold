@@ -192,15 +192,15 @@ public class RepeaterContainer implements Container {
 	}
 
 	@Override
-	public ItemStack removeItem(int slot, int amount) {
-		if (isSign(slot) || amount <= 0) {
+	public ItemStack removeItem(int slot, int count) {
+		if (isSign(slot) || count <= 0) {
 			return ItemStack.EMPTY;
 		}
 		ItemStack stack = items.get(slot);
 		if (stack.isEmpty()) {
 			return ItemStack.EMPTY;
 		}
-		ItemStack removed = stack.split(amount);
+		ItemStack removed = stack.split(count);
 		rebuild();
 		return removed;
 	}
@@ -217,11 +217,11 @@ public class RepeaterContainer implements Container {
 	}
 
 	@Override
-	public void setItem(int slot, ItemStack stack) {
+	public void setItem(int slot, ItemStack itemStack) {
 		if (isSign(slot)) {
 			return;
 		}
-		items.set(slot, stack);
+		items.set(slot, itemStack);
 		rebuild();
 	}
 

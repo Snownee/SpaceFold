@@ -69,7 +69,7 @@ public class FactoryBlock extends Block implements EntityBlock {
 	}
 
 	@Override
-	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hit) {
+	protected InteractionResult useWithoutItem(BlockState state, Level level, BlockPos pos, Player player, BlockHitResult hitResult) {
 		if (player instanceof ServerPlayer serverPlayer) {
 			serverPlayer.openMenu(getMenuProvider(state, level, pos));
 		}

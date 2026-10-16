@@ -39,6 +39,13 @@ public final class PreviewCache {
 		return structureVersion;
 	}
 
+	public static void clear() {
+		snapshots.clear();
+		pendingSnapshots.clear();
+		version++;
+		structureVersion++;
+	}
+
 	public static @Nullable RoomSnapshot getSnapshot(int id) {
 		if (id < 0) {
 			return null;

@@ -3,6 +3,7 @@ package snownee.spacefold.block.entity;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 import org.jspecify.annotations.Nullable;
@@ -102,7 +103,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	}
 
 	private void shake() {
-		shakeTime = level.getGameTime();
+		shakeTime = Objects.requireNonNull(level).getGameTime();
 		refresh();
 	}
 
@@ -138,6 +139,9 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	}
 
 	public void tick() {
+		if (level == null || level.isClientSide()) {
+			return;
+		}
 		if (!pendingItem.isEmpty()) {
 			if (--pendingTicks <= 0) {
 				ItemStack stack = pendingItem;
@@ -181,6 +185,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 			}
 			progress = 0;
 			produce(receiver);
+			setChanged();
 		} else {
 			if (!consumeProgress(progress + 1)) {
 				return;
@@ -189,7 +194,6 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 			progressTime = level.getGameTime();
 			refresh();
 		}
-		setChanged();
 	}
 
 	private @Nullable FactoryBlockEntity findEmptyFactory() {
@@ -235,7 +239,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	private boolean hasClearPath(BlockPos receiverPos) {
 		Vec3 from = Vec3.atCenterOf(getBlockPos().above());
 		Vec3 to = Vec3.atCenterOf(receiverPos.above());
-		BlockHitResult hit = level.clip(new ClipContext(
+		BlockHitResult hit = Objects.requireNonNull(level).clip(new ClipContext(
 				from,
 				to,
 				ClipContext.Block.COLLIDER,
@@ -286,7 +290,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	private boolean consumeProgress(int nextProgress) {
 		int duration = Math.max(1, SpaceFoldConfig.factoryDurationTicks);
 		Object2LongMap<ItemVariant> deltas = new Object2LongOpenHashMap<>();
-		for (SimulationResult.Material material : templateResult.materials()) {
+		for (SimulationResult.Material material : Objects.requireNonNull(templateResult).materials()) {
 			long total = material.count();
 			long delta = total * nextProgress / duration - total * (nextProgress - 1) / duration;
 			if (delta > 0) {
@@ -380,6 +384,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 	}
 
 	private void produce(FactoryBlockEntity receiver) {
+		ServerLevel level = (ServerLevel) Objects.requireNonNull(this.level);
 		ItemStack made = new ItemStack(CoreModule.REPEATER.get(), 1);
 		made.set(CoreModule.SIMULATION_RESULT.get(), templateResult);
 		Component name = item.get(DataComponents.CUSTOM_NAME);
@@ -402,7 +407,7 @@ public class FactoryBlockEntity extends ModBlockEntity implements Container {
 				0.8F + level.getRandom().nextFloat() * 0.4F);
 		Vec3 from = Vec3.atCenterOf(getBlockPos().above());
 		Vec3 to = Vec3.atCenterOf(receiver.getBlockPos().above());
-		((ServerLevel) level).sendParticles(new BeamParticleOptions(from, to, duration), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
+		level.sendParticles(new BeamParticleOptions(from, to, duration), from.x, from.y, from.z, 1, 0.0, 0.0, 0.0, 0.0);
 	}
 
 	@Override

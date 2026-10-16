@@ -149,7 +149,7 @@ public class DetailsScreen extends Screen {
 	private int graphSnapshotId = Integer.MIN_VALUE;
 	private int graphVersion = Integer.MIN_VALUE;
 	private RadialGraphLayout.@Nullable Node hoveredNode;
-	private MaterialList materialList;
+	private @Nullable MaterialList materialList;
 	private boolean materialsVisible;
 
 	public DetailsScreen(List<Entry> entries, boolean showProgress, int snapshotId, int configSlot, ItemStack viewedStack) {
@@ -700,8 +700,8 @@ public class DetailsScreen extends Screen {
 			GuiGraphicsExtractor graphics,
 			RenderPipeline pipeline,
 			Identifier spriteId,
-			float x,
-			float y,
+			float x0,
+			float y0,
 			float width,
 			float height,
 			int color) {
@@ -714,16 +714,16 @@ public class DetailsScreen extends Screen {
 				.map(GuiMetadataSection::scaling)
 				.orElse(GuiSpriteScaling.DEFAULT);
 		if (scaling instanceof GuiSpriteScaling.NineSlice nineSlice) {
-			blitNineSlicedSprite(graphics, pipeline, sprite, nineSlice, x, y, width, height, color);
+			blitNineSlicedSprite(graphics, pipeline, sprite, nineSlice, x0, y0, width, height, color);
 		} else {
 			blitSprite(
 					graphics,
 					pipeline,
 					sprite,
-					x,
-					y,
-					x + width,
-					y + height,
+					x0,
+					y0,
+					x0 + width,
+					y0 + height,
 					sprite.getU0(),
 					sprite.getV0(),
 					sprite.getU1(),
@@ -951,7 +951,7 @@ public class DetailsScreen extends Screen {
 		}
 		graphSnapshotId = snapshotId;
 		graphVersion = structureVersion;
-		IntFunction<List<ItemStack>> childrenLookup = id -> {
+		IntFunction<@Nullable List<ItemStack>> childrenLookup = id -> {
 			RoomSnapshot child = id == snapshotId ? snapshot : PreviewCache.getSnapshot(id);
 			return child == null ? null : child.topRepeaterResults(Objects.requireNonNull(minecraft.level).registryAccess());
 		};
@@ -1130,22 +1130,22 @@ public class DetailsScreen extends Screen {
 	}
 
 	@Override
-	public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
+	public boolean mouseDragged(MouseButtonEvent event, double dx, double dy) {
 		if (nodeDragging != null) {
-			graphLayout.moveNode(nodeDragging, nodeDragging.x() + (float) dragX / zoom, nodeDragging.y() + (float) dragY / zoom);
+			graphLayout.moveNode(nodeDragging, nodeDragging.x() + (float) dx / zoom, nodeDragging.y() + (float) dy / zoom);
 			return true;
 		}
 		if (dragging) {
-			dragAccumX += -dragX / zoom;
-			dragAccumY += -dragY / zoom;
+			dragAccumX += -dx / zoom;
+			dragAccumY += -dy / zoom;
 			return true;
 		}
 		if (yawDraggingId >= 0) {
-			float yaw = sessionYaws.getOrDefault(yawDraggingId, PreviewCache.getYaw(yawDraggingId)) + (float) dragX * FOCUS_YAW_SPEED;
+			float yaw = sessionYaws.getOrDefault(yawDraggingId, PreviewCache.getYaw(yawDraggingId)) + (float) dx * FOCUS_YAW_SPEED;
 			sessionYaws.put(yawDraggingId, yaw);
 			return true;
 		}
-		return super.mouseDragged(event, dragX, dragY);
+		return super.mouseDragged(event, dx, dy);
 	}
 
 	@Override
@@ -1214,21 +1214,21 @@ public class DetailsScreen extends Screen {
 	}
 
 	@Override
-	public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+	public boolean mouseScrolled(double x, double y, double scrollX, double scrollY) {
 		if (isSpaceTab() && scrollY != 0.0) {
 			focusZoomActive = false;
 			float newTarget = Mth.clamp(targetZoom * (float) Math.exp(scrollY * ZOOM_SPEED), MIN_ZOOM, MAX_ZOOM);
 			if (scrollY > 0.0 && targetZoom < FOCUS_ZOOM && newTarget >= FOCUS_ZOOM && !canCaptureFocus()) {
-				nudgeCameraTowards(mouseX, mouseY);
+				nudgeCameraTowards(x, y);
 				return true;
 			}
 			targetZoom = newTarget;
 			if (scrollY > 0.0 && !isFocusMode()) {
-				nudgeCameraTowards(mouseX, mouseY);
+				nudgeCameraTowards(x, y);
 			}
 			return true;
 		}
-		return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+		return super.mouseScrolled(x, y, scrollX, scrollY);
 	}
 
 	@Override
@@ -1248,7 +1248,7 @@ public class DetailsScreen extends Screen {
 				return true;
 			}
 		}
-		if (tabNavigationBar.keyPressed(event)) {
+		if (Objects.requireNonNull(tabNavigationBar).keyPressed(event)) {
 			return true;
 		}
 		return super.keyPressed(event);

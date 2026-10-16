@@ -6,10 +6,12 @@ import java.util.Locale;
 import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLevelEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.item.v1.ItemTooltipCallback;
 import net.fabricmc.fabric.api.client.model.loading.v1.ModelLoadingPlugin;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.particle.v1.ParticleGroupRegistry;
 import net.fabricmc.fabric.api.client.particle.v1.ParticleProviderRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.ClientTooltipComponentCallback;
@@ -39,6 +41,7 @@ import snownee.spacefold.client.ClientSimulationTooltip;
 import snownee.spacefold.client.FacingCtmModel;
 import snownee.spacefold.client.FactoryRenderer;
 import snownee.spacefold.client.FactoryScreen;
+import snownee.spacefold.client.PreviewCache;
 import snownee.spacefold.client.RepeaterScreen;
 import snownee.spacefold.client.SimulationHud;
 import snownee.spacefold.client.SimulationTooltip;
@@ -144,6 +147,11 @@ public class ClientProxy implements ClientModInitializer {
 				: null);
 		PictureInPictureRendererRegistry.register(context -> new VoxelRoomRenderer(context.bufferSource()));
 		PictureInPictureRendererRegistry.register(context -> new RoomSkyRenderer(context.bufferSource()));
+		ClientLevelEvents.AFTER_CLIENT_LEVEL_CHANGE.register((client, level) -> VoxelRoomRenderer.clearCache());
+		ClientPlayConnectionEvents.DISCONNECT.register((listener, client) -> {
+			VoxelRoomRenderer.clearCache();
+			PreviewCache.clear();
+		});
 		SpecialModelRenderers.ID_MAPPER.put(SpaceFold.id("repeater_paint"), RepeaterPaintSpecialRenderer.Unbaked.MAP_CODEC);
 		ModelLoadingPlugin.register(context -> {
 			context.modifyBlockModelOnLoad().register((model, ctx) -> {

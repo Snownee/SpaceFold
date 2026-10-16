@@ -1,6 +1,7 @@
 package snownee.spacefold.network;
 
 import java.util.List;
+import java.util.Objects;
 
 import org.jspecify.annotations.Nullable;
 
@@ -43,7 +44,7 @@ public record SSimulationRatesPacket(int progress, Section inputs, Section outpu
 					if (fluid) {
 						FluidVariant.PACKET_CODEC.encode(output, value.fluid());
 					} else {
-						ItemVariant.PACKET_CODEC.encode(output, value.item());
+						ItemVariant.PACKET_CODEC.encode(output, Objects.requireNonNull(value.item()));
 					}
 					output.writeDouble(value.rate());
 				},
